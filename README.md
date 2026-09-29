@@ -9,7 +9,6 @@ Fresh Project & Portfolio V foundation preserving the reusable Gateware, Vulkan,
 - Ninja
 - LLVM `clang-cl` (the tested `dev` compiler)
 - Vulkan SDK with `VULKAN_SDK` set
-- Optional: Neovim and clangd
 
 ## Build and run
 
