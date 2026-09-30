@@ -14,6 +14,9 @@ set(PROJECT_SOURCES
     src/DRAW/Level.cpp
     src/DRAW/VulkanBuffers.cpp
     src/DRAW/VulkanRenderer.cpp
+    src/GAME/Player.cpp
+    src/GAME/Enemy.cpp
+    src/GAME/Combat.cpp
     src/GAME/GameManager.cpp
     src/UTIL/GameConfig.cpp
     src/UTIL/Utilities.cpp)
@@ -26,6 +29,7 @@ set(PROJECT_HEADERS
     src/DRAW/Utility/h2bParser.h
     src/DRAW/Utility/load_data_oriented.h
     src/GAME/GameComponents.h
+    src/GAME/GameplaySystems.h
     src/GAME/GameManager.h
     src/UTIL/GameConfig.h
     src/UTIL/Utilities.h)

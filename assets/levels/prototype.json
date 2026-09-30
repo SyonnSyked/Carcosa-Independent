@@ -62,7 +62,8 @@
                 1.6213061809539795,
                 1.0
             ],
-            "name": "Enemy"
+            "name": "Enemy",
+            "gameType": "enemy"
         },
         {
             "bounds": [
@@ -190,7 +191,8 @@
                 -5.280776023864746,
                 1.0
             ],
-            "name": "Player"
+            "name": "Player",
+            "gameType": "player"
         }
     ]
 }
