@@ -32,16 +32,18 @@ set(PROJECT_HEADERS
 set(PROJECT_SHADERS shaders/LevelVertex.hlsl shaders/LevelPixel.hlsl)
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES} ${PROJECT_HEADERS} ${PROJECT_SHADERS})
-add_custom_command(
-    TARGET ${PROJECT_NAME}
-    POST_BUILD
+add_custom_target(copy_runtime_content ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_CURRENT_SOURCE_DIR}/config"
             "$<TARGET_FILE_DIR:${PROJECT_NAME}>/config"
     COMMAND ${CMAKE_COMMAND} -E copy_directory
             "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
             "$<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders"
-    COMMENT "Copying runtime configuration and shaders")
+    COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+            "$<TARGET_FILE_DIR:${PROJECT_NAME}>/assets"
+    COMMENT "Copying runtime configuration, shaders, and assets")
+add_dependencies(${PROJECT_NAME} copy_runtime_content)
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_EXTENSIONS OFF)
 target_compile_definitions(${PROJECT_NAME} PRIVATE UNICODE _UNICODE $<$<CONFIG:Debug>:DEBUG>)

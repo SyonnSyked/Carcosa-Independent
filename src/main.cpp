@@ -31,6 +31,9 @@ int main()
 
         GW::MATH::GMATRIXF cameraMatrix;
         GW::MATH::GMatrix::IdentityF(cameraMatrix);
+        cameraMatrix.row4.x = settings.at("PreviewCamera").at("x").as<float>();
+        cameraMatrix.row4.y = settings.at("PreviewCamera").at("y").as<float>();
+        cameraMatrix.row4.z = settings.at("PreviewCamera").at("z").as<float>();
         const auto camera = registry.create();
         registry.emplace<DRAW::Camera>(camera, DRAW::Camera{cameraMatrix});
 
@@ -41,6 +44,11 @@ int main()
                 {{0.04f, 0.06f, 0.09f, 1.0f}},
                 {1.0f, 0}, 65.0f, 0.1f, 1000.0f});
         registry.emplace<DRAW::VulkanRenderer>(display);
+
+        registry.emplace<DRAW::CPULevel>(display, DRAW::CPULevel{
+            settings.at("Content").at("level").as<std::string>(),
+            settings.at("Content").at("models").as<std::string>(), {}});
+        registry.emplace<DRAW::GPULevel>(display);
 
         auto previous = std::chrono::steady_clock::now();
         while (!registry.any_of<APP::WindowClosed>(display)) {
