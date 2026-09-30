@@ -166,8 +166,8 @@ private:
 
 		unsigned int fileSize = 0;
 		file.GetFileSize(gameLevelPath, fileSize);
-		char* jsonFile = new char[fileSize];
-		file.Read(jsonFile, fileSize);
+		std::string jsonFile(fileSize, '\0');
+		file.Read(jsonFile.data(), fileSize);
 
 		nlohmann::json GameLevelData = nlohmann::json::parse(jsonFile);
 

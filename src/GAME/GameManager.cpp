@@ -5,6 +5,38 @@
 
 namespace GAME
 {
+entt::entity CreateRenderable(entt::registry& registry, const std::string& modelName,
+                              const GW::MATH::GMATRIXF& transform)
+{
+    const auto* manager = registry.ctx().find<DRAW::ModelManager>();
+    if (!manager || !manager->models.contains(modelName))
+        throw std::runtime_error("Renderable template not loaded: " + modelName +
+                                 " (export it in the selected world with gameType != none)");
+    const auto& source = manager->models.at(modelName);
+    for (auto mesh : source.meshEntities)
+        if (!registry.valid(mesh) || !registry.all_of<DRAW::GeometryData, DRAW::GPUInstance>(mesh))
+            throw std::runtime_error("Renderable template is no longer valid: " + modelName);
+
+    const auto entity = registry.create();
+    try {
+        registry.emplace<Transform>(entity, Transform{transform});
+        registry.emplace<DRAW::MeshCollection>(entity, DRAW::MeshCollection{{}, source.collider});
+        for (auto mesh : source.meshEntities) {
+            const auto geometry = registry.get<DRAW::GeometryData>(mesh);
+            auto instance = registry.get<DRAW::GPUInstance>(mesh);
+            instance.transform = transform;
+            const auto clone = registry.create();
+            registry.get<DRAW::MeshCollection>(entity).meshEntities.push_back(clone);
+            registry.emplace<DRAW::GeometryData>(clone, geometry);
+            registry.emplace<DRAW::GPUInstance>(clone, instance);
+        }
+    } catch (...) {
+        registry.destroy(entity);
+        throw;
+    }
+    return entity;
+}
+
 void UpdateGameSystems(entt::registry& registry)
 {
     const float deltaTime = static_cast<float>(registry.ctx().get<UTIL::DeltaTime>().dtSec);

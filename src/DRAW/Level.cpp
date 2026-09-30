@@ -11,7 +11,8 @@ void Construct_CPULevel(entt::registry &registry, entt::entity entity)
     log.Create("LevelLoaderLog.txt");
     log.EnableConsoleLogging(true);
 
-    cpuLevel.lvlData.LoadLevel(cpuLevel.levelPath.c_str(), cpuLevel.modelFolder.c_str(), log);
+    if (!cpuLevel.lvlData.LoadLevel(cpuLevel.levelPath.c_str(), cpuLevel.modelFolder.c_str(), log))
+        throw std::runtime_error("Could not load world: " + cpuLevel.levelPath);
 }
 
 void Construct_GPULevel(entt::registry &registry, entt::entity entity)
@@ -21,6 +22,13 @@ void Construct_GPULevel(entt::registry &registry, entt::entity entity)
     if (cpuLevel == nullptr)
         return;
 
+    auto &modelManager = registry.ctx().emplace<ModelManager>();
+    if (cpuLevel->lvlData.levelVertices.empty() || cpuLevel->lvlData.levelIndices.empty()) {
+        std::cout << "World contains no renderable geometry. Export JSON to "
+                  << cpuLevel->levelPath << " and H2B models to " << cpuLevel->modelFolder << '\n';
+        return;
+    }
+
     registry.emplace<VulkanVertexBuffer>(entity);
     registry.emplace<std::vector<H2B::VERTEX>>(entity, cpuLevel->lvlData.levelVertices);
     registry.patch<VulkanVertexBuffer>(entity);
@@ -29,7 +37,6 @@ void Construct_GPULevel(entt::registry &registry, entt::entity entity)
     registry.emplace<std::vector<unsigned int>>(entity, cpuLevel->lvlData.levelIndices);
     registry.patch<VulkanIndexBuffer>(entity);
 
-    auto &modelManager = registry.ctx().emplace<ModelManager>();
     auto &models = modelManager.models;
 
     for (const auto &object : cpuLevel->lvlData.blenderObjects) {
