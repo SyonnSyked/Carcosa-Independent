@@ -1,5 +1,6 @@
 #pragma once
 namespace GAME {
+void InitializeGameplay(entt::registry& registry);
 void UpdateGameSystems(entt::registry& registry);
 // Clone a loaded dynamic template by its exact Blender object name.
 // Throws for an unavailable model. The returned entity owns its mesh instances.

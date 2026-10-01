@@ -50,6 +50,8 @@ int main()
             settings.at("Content").at("models").as<std::string>(), {}});
         registry.emplace<DRAW::GPULevel>(display);
 
+        GAME::InitializeGameplay(registry);
+
         auto previous = std::chrono::steady_clock::now();
         while (!registry.any_of<APP::WindowClosed>(display)) {
             const auto now = std::chrono::steady_clock::now();

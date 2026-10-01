@@ -1,5 +1,6 @@
 #include "GameManager.h"
 #include "GameComponents.h"
+#include "GameplaySystems.h"
 #include "../DRAW/DrawComponents.h"
 #include "../UTIL/Utilities.h"
 
@@ -37,9 +38,42 @@ entt::entity CreateRenderable(entt::registry& registry, const std::string& model
     return entity;
 }
 
+void InitializeGameplay(entt::registry& registry)
+{
+    const auto& settings = *registry.ctx().get<UTIL::Config>().gameConfig;
+    const auto levels = registry.view<DRAW::CPULevel>();
+    const auto& level = registry.get<DRAW::CPULevel>(levels.front()).lvlData;
+    for (const auto* role : {"Player", "Enemy"}) {
+        const auto& tuning = settings.at(role);
+        const auto name = tuning.at("model").as<std::string>();
+        bool found = false;
+        for (const auto& object : level.blenderObjects) {
+            if (name != object.blendername) continue;
+            const auto entity = CreateRenderable(registry, name, level.levelTransforms[object.transformIndex]);
+            if (std::string(role) == "Player") registry.emplace<Player>(entity);
+            else registry.emplace<Enemy>(entity);
+            const float health = tuning.at("health").as<float>();
+            registry.emplace<Health>(entity, Health{health, health});
+            registry.emplace<Movement>(entity, Movement{tuning.at("speed").as<float>()});
+            registry.emplace<MeleeAttack>(entity, MeleeAttack{tuning.at("damage").as<float>(),
+                tuning.at("range").as<float>(), tuning.at("cooldown").as<float>()});
+            found = true;
+            break;
+        }
+        if (!found) throw std::runtime_error("Gameplay object not loaded: " + name);
+    }
+    UpdateCamera(registry);
+    std::cout << "Gameplay ready: WASD moves, SPACE attacks (press again for each swing)." << std::endl;
+}
+
 void UpdateGameSystems(entt::registry& registry)
 {
     const float deltaTime = static_cast<float>(registry.ctx().get<UTIL::DeltaTime>().dtSec);
+    UpdateCombatTimers(registry, deltaTime);
+    UpdatePlayer(registry, deltaTime);
+    UpdateEnemy(registry, deltaTime);
+    UpdateCamera(registry);
+
     for (auto entity : registry.view<Transform, Velocity>()) {
         auto& transform = registry.get<Transform>(entity).matrix;
         const auto& velocity = registry.get<Velocity>(entity).vector;
