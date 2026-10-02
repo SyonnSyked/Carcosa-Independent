@@ -17,6 +17,7 @@ set(PROJECT_SOURCES
     src/GAME/Player.cpp
     src/GAME/Enemy.cpp
     src/GAME/Combat.cpp
+    "src/GAME/PickUp&Apply.cpp"
     src/GAME/GameManager.cpp
     src/UTIL/GameConfig.cpp
     src/UTIL/Utilities.cpp)
@@ -34,6 +35,9 @@ set(PROJECT_HEADERS
     src/UTIL/GameConfig.h
     src/UTIL/Utilities.h)
 set(PROJECT_SHADERS shaders/LevelVertex.hlsl shaders/LevelPixel.hlsl)
+
+# Keep object filenames containing & out of the Windows linker shell command.
+set(CMAKE_NINJA_FORCE_RESPONSE_FILE ON)
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES} ${PROJECT_HEADERS} ${PROJECT_SHADERS})
 add_custom_target(copy_runtime_content ALL
