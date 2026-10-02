@@ -164,6 +164,8 @@ void InitializeGameplay(entt::registry &registry)
     const auto player =
         CreateRenderable(registry, playerConfig.model, playerConfig.transform.matrix);
     registry.emplace<Player>(player);
+    registry.emplace<Class>(player, Class{"Warrior"});
+    registry.emplace<WarriorAOE>(player);
     AttachCharacter(registry, player, playerConfig);
     CreateEnemy(registry, enemyConfig, enemyConfig.transform.matrix);
     const auto spawnerEntity = registry.create();
@@ -207,3 +209,4 @@ entt::entity CreateEnemy(entt::registry &registry, const CharacterConfig &config
 }
 
 } // namespace GAME
+
