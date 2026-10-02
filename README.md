@@ -91,7 +91,51 @@ Gateware Input -> GAME systems -> ECS components / Transform
 
 A dead enemy receives `ToDestroy`; GameManager destroys it after updates, and the existing MeshCollection callback destroys its visible meshes. A dead player stays visible with zero health; movement, attacks, and enemy activity stop. The camera stays anchored there.
 
-This reference deliberately has no collisions, ground boundaries, pathfinding, animation, HUD, or respawn. Actors can move beyond the finite Ground mesh. Materials use H2B colors and lighting; the current shaders do not sample textures. Content/config changes require restarting; there is no hot reload. Missing H2B files are logged to the console and `LevelLoaderLog.txt`; missing gameplay actors fail initialization.
+This reference deliberately has no collisions, ground boundaries, pathfinding, animation, HUD, or player respawn. Actors can move beyond the finite Ground mesh. Materials use H2B colors and lighting; the current shaders do not sample textures. Content/config changes require restarting; there is no hot reload. Missing H2B files are logged to the console and `LevelLoaderLog.txt`; missing gameplay actors fail initialization.
+
+## Horde spawner teammate reading guide
+
+The original Enemy and every spawned Enemy use `CreateEnemy(registry, config, placement)` in `src/GAME/GameManager.cpp`. It returns the actor ID, uses `CreateRenderable` for its Transform and owned meshes, attaches the Enemy tag, and copies fresh Health, Movement and MeleeAttack state. It never reads the INI or searches for another enemy's position.
+
+Read this flow in order:
+
+1. `config/game.ini`: `[Player]` and `[Enemy]` provide character recipes; `[HordeSpawner]` provides `enabled`, `spawnInterval` (seconds), `minimumRadius`, `maximumRadius`, `maximumAlive`, and `totalSpawnLimit`. Zero total limit means unlimited; zero interval means at most one spawn per frame. Negative/nonfinite tuning, reversed radii, nonpositive alive caps, negative total limits and missing dynamic models fail startup with a console diagnostic.
+2. `src/GAME/GameManager.cpp`, `LoadCharacter` and `InitializeGameplay`: parse and validate once, obtain placement from the selected Blender world, create the initial actors, and store the shared Enemy `CharacterConfig` in the registry context. The Player recipe is used during initialization only.
+3. `src/GAME/GameComponents.h`, `CharacterConfig` and `HordeSpawner`: recipes initialize independent gameplay components; the spawner component holds tuning, elapsed time and its own spawn count. A separate spawner entity has Transform but needs no renderable. Its initial transform comes from the configured Enemy's exported placement.
+4. `src/GAME/HordeSpawner.cpp`, `UpdateHordeSpawner`: find the living Player's Transform through EnTT, count Enemy entities with positive Health excluding `ToDestroy`, advance timers, and enforce limits. One registry-owned random generator selects an angle and radius around the Player in X/Z. The spawner Transform preserves Enemy orientation, scale and Y height. A saturated timer permits spawning when a cap frees up, without a backlog burst. The original Enemy counts toward the alive cap, but not the spawner's total count. Spawning pauses when the Player dies.
+5. `src/GAME/GameManager.cpp`, `CreateEnemy` and `AttachCharacter`: create separate owned renderable instances and ECS state. There is no separate enemy collection or AI object.
+6. `src/GAME/Enemy.cpp`, `UpdateEnemy`, and `src/GAME/Combat.cpp`, `TryMeleeAttack`: existing component queries automatically include new Enemy actors. Damage and cooldown state are independent; deaths mark enemies `ToDestroy`.
+7. `src/GAME/GameManager.cpp`, `UpdateGameSystems`: spawn after combat so deaths immediately free population slots; new enemies start AI next frame. Synchronize actor Transforms to their owned GPUInstances, then perform deferred destruction. `src/DRAW/Level.cpp`, `Destroy_MeshCollection`, already deletes each actor's owned mesh entities while leaving templates and other actors intact.
+
+```text
+INI configuration -> CharacterConfig initialization recipe
+                  -> HordeSpawner component -> UpdateHordeSpawner
+                  -> CreateEnemy -> independent ECS components
+                  -> existing UpdateEnemy / TryMeleeAttack
+                  -> existing UpdateGameSystems render synchronization
+```
+
+Long frames deliberately discard missed spawn intervals, and each spawner creates at most one enemy per update. There is no collision-aware placement; the ring may extend past Ground. Changing tuning requires restarting the game.
+
+## Damage feedback teammate reading guide
+
+`config/game.ini`, `[DamageFeedback]`, controls `enabled`, `duration` (seconds), and `flashR`, `flashG`, `flashB` (finite RGB channels in [0,1]). The prototype uses a white 0.12-second flash. `InitializeGameplay` calls `InitializeDamageFeedback` in `src/GAME/DamageFeedback.cpp` once, validates the values, and stores `DamageFeedbackConfig` in registry context. Duration must be positive, even when feedback is disabled. Configuration changes require restarting.
+
+`src/GAME/Combat.cpp`, `TryMeleeAttack`, is the existing shared damage path. When its unchanged damage calculation reduces Health, it calls `ActivateDamageFlash` for the victim. Misses and zero damage do not activate the effect. `DamageFlash` in `src/GAME/GameComponents.h` stores only remaining seconds on the actor; subsequent hits reset that time.
+
+`src/GAME/DamageFeedback.cpp`, `SetFlashAppearance`, follows the actor's existing `MeshCollection` and changes only each owned `GPUInstance.matData.Ke` (emissive RGB). A temporary mesh component, `NormalEmission`, saves the original RGB once, so repeated hits cannot overwrite it with the flash color. Shared templates, base colors, other material fields, geometry and GPU resources remain untouched. The existing pixel shader already adds emissive color to lighting: white produces a bright white flash; other colors produce a bright tint over the normal surface.
+
+`UpdateGameSystems` in `src/GAME/GameManager.cpp` calls `UpdateDamageFlash` before combat. This ages previous effects while allowing new hits their full duration. Active flashes keep their emissive color; expiry restores the exact saved RGB and removes both temporary components. A dead Player still updates and returns to its blue appearance. Dead enemies retain the existing deferred destruction policy; their owned meshes and saved RGB state are deleted by `Destroy_MeshCollection`. No saved entity references or resource ownership were added. All HordeSpawner enemies automatically use the same feedback path.
+
+```text
+TryMeleeAttack reduces Health -> ActivateDamageFlash -> DamageFlash timer
+                             -> UpdateDamageFlash / SetFlashAppearance
+                             -> owned GPUInstance emissive RGB
+                             -> existing Vulkan upload and LevelPixel.hlsl
+                             -> visible damage indication
+```
+
+Enemies killed by a hit are removed before the next render, so lethal hits do not keep their models visible just to show a flash. This preserves the existing death behavior. Very short flashes may be missed at low frame rates.
 
 ## Optional GAME-side model instances
 

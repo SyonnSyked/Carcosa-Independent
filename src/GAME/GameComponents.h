@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 
 namespace GAME {
 struct Player {
@@ -75,12 +76,65 @@ struct PickUp {
     float Amount = 0.0;
 };
 
+struct Player {
+    bool attackHeld = false;
+};
+
+struct Enemy {};
+
+struct Health {
+    float current, maximum;
+};
+
+struct DamageFlash {
+    float remaining;
+};
+
+struct DamageFeedbackConfig {
+    bool enabled;
+    float duration;
+    float flashR, flashG, flashB;
+};
+
+struct HordeSpawner {
+    bool enabled;
+    float spawnInterval;
+    float minimumRadius, maximumRadius;
+    int maximumAlive;
+    int totalSpawnLimit; // Zero means unlimited; counts only this spawner's creations.
+    float elapsed = 0;
+    std::uint64_t spawned = 0;
+};
+
+struct Movement {
+    float speed;
+};
+struct MeleeAttack {
+    float damage, range, cooldown;
+    float remaining = 0;
+};
+
+struct Collidable {};
+struct Obstacle {};
+struct ToDestroy {};
+
 struct Transform {
     GW::MATH::GMATRIXF matrix;
 };
 
 struct Velocity {
     GW::MATH::GVECTORF vector;
+};
+
+struct CharacterConfig {
+    // Initialization recipe, not live ECS state. Transform preserves exported scale/orientation.
+    MeleeAttack attackData;
+    Transform transform;
+
+    std::string model;
+
+    float health;
+    float speed;
 };
 
 } // namespace GAME

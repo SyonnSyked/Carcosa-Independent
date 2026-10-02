@@ -18,6 +18,8 @@ set(PROJECT_SOURCES
     src/GAME/Enemy.cpp
     src/GAME/Combat.cpp
     "src/GAME/PickUp&Apply.cpp"
+    src/GAME/DamageFeedback.cpp
+    src/GAME/HordeSpawner.cpp
     src/GAME/GameManager.cpp
     src/UTIL/GameConfig.cpp
     src/UTIL/Utilities.cpp)

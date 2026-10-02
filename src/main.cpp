@@ -10,21 +10,21 @@ int main()
         entt::registry registry;
         CCL::InitializeComponentLogic(registry);
 
-        auto& config = registry.ctx().emplace<UTIL::Config>();
+        auto &config = registry.ctx().emplace<UTIL::Config>();
         registry.ctx().emplace<UTIL::DeltaTime>();
-        const auto& settings = *config.gameConfig;
+        const auto &settings = *config.gameConfig;
 
         const auto display = registry.create();
-        registry.emplace<APP::Window>(display, APP::Window{
-            settings.at("Window").at("xstart").as<int>(),
-            settings.at("Window").at("ystart").as<int>(),
-            settings.at("Window").at("width").as<int>(),
-            settings.at("Window").at("height").as<int>(),
-            GW::SYSTEM::GWindowStyle::WINDOWEDBORDERED,
-            settings.at("Window").at("title").as<std::string>()});
+        registry.emplace<APP::Window>(
+            display, APP::Window{settings.at("Window").at("xstart").as<int>(),
+                                 settings.at("Window").at("ystart").as<int>(),
+                                 settings.at("Window").at("width").as<int>(),
+                                 settings.at("Window").at("height").as<int>(),
+                                 GW::SYSTEM::GWindowStyle::WINDOWEDBORDERED,
+                                 settings.at("Window").at("title").as<std::string>()});
 
-        auto& window = registry.get<GW::SYSTEM::GWindow>(display);
-        auto& input = registry.ctx().emplace<UTIL::Input>();
+        auto &window = registry.get<GW::SYSTEM::GWindow>(display);
+        auto &input = registry.ctx().emplace<UTIL::Input>();
         input.immediateInput.Create(window);
         input.bufferedInput.Create(window);
         input.gamePads.Create();
@@ -37,17 +37,21 @@ int main()
         const auto camera = registry.create();
         registry.emplace<DRAW::Camera>(camera, DRAW::Camera{cameraMatrix});
 
-        registry.emplace<DRAW::VulkanRendererInitialization>(display,
-            DRAW::VulkanRendererInitialization{
-                settings.at("Shaders").at("vertex").as<std::string>(),
-                settings.at("Shaders").at("pixel").as<std::string>(),
-                {{0.04f, 0.06f, 0.09f, 1.0f}},
-                {1.0f, 0}, 65.0f, 0.1f, 1000.0f});
+        registry.emplace<DRAW::VulkanRendererInitialization>(
+            display, DRAW::VulkanRendererInitialization{
+                         settings.at("Shaders").at("vertex").as<std::string>(),
+                         settings.at("Shaders").at("pixel").as<std::string>(),
+                         {{0.04f, 0.06f, 0.09f, 1.0f}},
+                         {1.0f, 0},
+                         65.0f,
+                         0.1f,
+                         1000.0f});
         registry.emplace<DRAW::VulkanRenderer>(display);
 
-        registry.emplace<DRAW::CPULevel>(display, DRAW::CPULevel{
-            settings.at("Content").at("level").as<std::string>(),
-            settings.at("Content").at("models").as<std::string>(), {}});
+        registry.emplace<DRAW::CPULevel>(
+            display, DRAW::CPULevel{settings.at("Content").at("level").as<std::string>(),
+                                    settings.at("Content").at("models").as<std::string>(),
+                                    {}});
         registry.emplace<DRAW::GPULevel>(display);
 
         GAME::InitializeGameplay(registry);
@@ -68,8 +72,7 @@ int main()
         registry.remove<DRAW::VulkanRenderer>(display);
         registry.clear();
         return 0;
-    }
-    catch (const std::exception& exception) {
+    } catch (const std::exception &exception) {
         std::cerr << "Startup failed: " << exception.what() << '\n';
         return 1;
     }
