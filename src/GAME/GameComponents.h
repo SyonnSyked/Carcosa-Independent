@@ -6,13 +6,6 @@
 namespace GAME {
 struct Player {
     bool attackHeld = false;
-    bool abilityHeld = false;
-};
-struct WarriorAOE {
-    float damage = 35.0f;
-    float radius = 3.0f;
-    float cooldown = 3.0f;
-    float remaining = 0.0f;
 };
 struct Enemy {};
 struct Health {
@@ -133,4 +126,3 @@ struct CharacterConfig {
 };
 
 } // namespace GAME
-

@@ -12,10 +12,6 @@ float GroundDistance(entt::registry &registry, entt::entity a, entt::entity b)
 
 void UpdateCombatTimers(entt::registry &registry, float deltaTime)
 {
-    for (auto entity : registry.view<WarriorAOE>()) {
-        auto &timer = registry.get<WarriorAOE>(entity).remaining;
-        timer = (std::max)(0.0f, timer - deltaTime);
-    }
     for (auto entity : registry.view<MeleeAttack>()) {
         auto &timer = registry.get<MeleeAttack>(entity).remaining;
         timer = (std::max)(0.0f, timer - deltaTime);
@@ -47,30 +43,4 @@ void TryMeleeAttack(entt::registry &registry, entt::entity attacker, entt::entit
             registry.emplace<ToDestroy>(target);
     }
 }
-void TryWarriorAOE(entt::registry &registry, entt::entity player)
-{
-    if (!registry.valid(player) ||
-        !registry.all_of<Player, Transform, Health, WarriorAOE>(player) ||
-        registry.any_of<ToDestroy>(player) || registry.get<Health>(player).current <= 0)
-        return;
-    auto &ability = registry.get<WarriorAOE>(player);
-    if (ability.remaining > 0)
-        return;
-    ability.remaining = ability.cooldown;
-    ActivateDamageFlash(registry, player);
-    unsigned hits = 0;
-    for (auto enemy : registry.view<Enemy, Transform, Health>(entt::exclude<ToDestroy>)) {
-        auto &health = registry.get<Health>(enemy);
-        if (health.current <= 0 || GroundDistance(registry, player, enemy) > ability.radius)
-            continue;
-        health.current = (std::max)(0.0f, health.current - ability.damage);
-        ActivateDamageFlash(registry, enemy);
-        ++hits;
-        if (health.current == 0)
-            registry.emplace<ToDestroy>(enemy);
-    }
-    std::cout << "Warrior AOE hit " << hits << " enemies for " << ability.damage
-              << " damage each. Cooldown: " << ability.cooldown << " seconds.\n";
-}
 } // namespace GAME
-

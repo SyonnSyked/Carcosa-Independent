@@ -177,16 +177,11 @@ void UpdatePlayer(entt::registry &registry, float deltaTime)
         const bool attackDown = IsInputDown(input, G_BUTTON_LEFT);
         const bool pressed = attackDown && !player.attackHeld;
         player.attackHeld = attackDown;
-        const bool abilityDown = IsInputDown(input, G_KEY_1);
-        const bool abilityPressed = abilityDown && !player.abilityHeld;
-        player.abilityHeld = abilityDown;
         if (registry.get<Health>(entity).current <= 0)
             continue;
         // Pick against the camera and mesh transforms of the displayed frame, before movement.
         const auto target = pressed ? PickEnemy(registry) : entt::null;
         MovePlayer(registry, entity, input, deltaTime);
-        if (abilityPressed)
-            TryWarriorAOE(registry, entity);
         if (target != entt::null && registry.all_of<MeleeAttack>(entity) &&
             GroundDistance(registry, entity, target) <= registry.get<MeleeAttack>(entity).range)
             TryMeleeAttack(registry, entity, target);
@@ -209,4 +204,3 @@ void UpdateCamera(entt::registry &registry)
     }
 }
 } // namespace GAME
-
