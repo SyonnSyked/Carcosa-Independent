@@ -1,13 +1,12 @@
 
-#pragma once
 #include "GameComponents.h"
-#include "Gateware.h"
-#include <entt/entt.hpp> 
+#include "GameplaySystems.h"
+#include <vector>
 // picking up bonuses and applying them
 namespace GAME
 {
 
-    inline void ApplyPickUp(entt::registry& reg, entt::entity player, const PickUp& p)
+    void ApplyPickUp(entt::registry& reg, entt::entity player, const PickUp& p)
     {
         auto& ModdingStats = reg.get_or_emplace<BonusStats>(player);
 
@@ -37,24 +36,24 @@ namespace GAME
 
 
 
-    inline void PickUp(entt::registry& reg, entt::entity player, const GW::MATH::GVECTORF& playerposition,float playerradius)
+    void PickUpObject(entt::registry& reg, entt::entity player, const GW::MATH::GVECTORF& playerposition,float playerradius)
     {
         std::vector<entt::entity> consumed;
 
         auto view = reg.view<Transform, PickUp>();
-        view.each([&](entt::entity item, transform& t, PickUp& p))
+        view.each([&](entt::entity item, Transform& t, PickUp& p)
         {
             float itemX = t.matrix.row4.x - playerposition.x;
-            float itemY = t.matrix.row4.y - playerposition.y;
+            float itemZ = t.matrix.row4.z - playerposition.z;
             float radius = playerradius+0.5f;
 
-            if(itemX * itemX + itemY * itemY <= r*r)
+            if(itemX * itemX + itemZ * itemZ <= radius*radius)
             {
-                ApplyPickUp(reg,player,p);
+                ApplyPickUp(reg,player, p);
                 consumed.push_back(item);
             }
 
-        }
+        });
 
         for(auto item : consumed)
             reg.destroy(item);
