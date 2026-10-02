@@ -1,5 +1,7 @@
 #pragma once
+#include <Gateware.h>
 #include <cstdint>
+#include <string>
 
 namespace GAME {
 struct Player {
@@ -74,6 +76,14 @@ enum class BounsStatPickUpType {
 struct PickUp {
     BounsStatPickUpType Type = BounsStatPickUpType::BonusDamage;
     float Amount = 0.0;
+};
+
+struct PickupConfig {
+    float collectionAllowance; // World units added to the caller's player radius.
+};
+
+struct GameplayCameraConfig {
+    GW::MATH::GVECTORF offset;
 };
 
 struct DamageFlash {

@@ -1,7 +1,7 @@
-#include "GameComponents.h"
-#include "GameplaySystems.h"
 #include "../DRAW/DrawComponents.h"
 #include "../UTIL/Utilities.h"
+#include "GameComponents.h"
+#include "GameplaySystems.h"
 
 namespace GAME {
 namespace {
@@ -38,18 +38,19 @@ void SetFlashAppearance(entt::registry &registry, entt::entity entity, bool acti
 
 void InitializeDamageFeedback(entt::registry &registry)
 {
-    const auto &settings = registry.ctx().get<UTIL::Config>().gameConfig->at("DamageFeedback");
-    DamageFeedbackConfig config{settings.at("enabled").as<bool>(),
-                                settings.at("duration").as<float>(),
-                                settings.at("flashR").as<float>(),
-                                settings.at("flashG").as<float>(),
-                                settings.at("flashB").as<float>()};
+    const auto &settings = *registry.ctx().get<UTIL::Config>().gameConfig;
+    DamageFeedbackConfig config{settings.at("DamageFeedback").at("enabled").as<bool>(),
+                                settings.RequireFloat("DamageFeedback", "duration"),
+                                settings.RequireFloat("DamageFeedback", "flashR"),
+                                settings.RequireFloat("DamageFeedback", "flashG"),
+                                settings.RequireFloat("DamageFeedback", "flashB")};
     const auto validColor = [](float channel) {
         return std::isfinite(channel) && channel >= 0 && channel <= 1;
     };
-    if (!std::isfinite(config.duration) || config.duration <= 0 ||
-        !validColor(config.flashR) || !validColor(config.flashG) || !validColor(config.flashB))
-        throw std::runtime_error("Invalid DamageFeedback configuration: duration must be positive and finite; RGB must be in [0,1]");
+    if (!std::isfinite(config.duration) || config.duration <= 0 || !validColor(config.flashR) ||
+        !validColor(config.flashG) || !validColor(config.flashB))
+        throw std::runtime_error("Invalid DamageFeedback configuration: duration must be positive "
+                                 "and finite; RGB must be in [0,1]");
     registry.ctx().emplace<DamageFeedbackConfig>(config);
 }
 
@@ -69,7 +70,8 @@ void UpdateDamageFlash(entt::registry &registry, float deltaTime)
     for (auto entity : registry.view<DamageFlash>()) {
         auto &flash = registry.get<DamageFlash>(entity);
         flash.remaining = (std::max)(0.0f, flash.remaining - deltaTime);
-        const bool active = registry.ctx().get<DamageFeedbackConfig>().enabled && flash.remaining > 0;
+        const bool active =
+            registry.ctx().get<DamageFeedbackConfig>().enabled && flash.remaining > 0;
         SetFlashAppearance(registry, entity, active);
         if (!active)
             registry.remove<DamageFlash>(entity);

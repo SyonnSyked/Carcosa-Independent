@@ -1,4 +1,7 @@
 #pragma once
+#include <Gateware.h>
+#include <entt/entt.hpp>
+#include <string>
 namespace GAME {
 struct CharacterConfig;
 void InitializeGameplay(entt::registry &registry);

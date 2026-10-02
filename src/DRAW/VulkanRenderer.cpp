@@ -476,7 +476,10 @@ namespace DRAW
 				registry.emplace<std::vector<GPUInstance>>(entity, std::move(gpuInstances));
 				registry.patch<VulkanGPUInstanceBuffer>(entity);
 
-				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanRenderer.pipelineLayout, 0, 1, &vulkanRenderer.descriptorSets[frame], 0, nullptr);
+				// Uploads use the acquired image index; command buffers use the rotating frame index.
+				unsigned int image;
+				vulkanRenderer.vlkSurface.GetSwapchainCurrentImage(image);
+				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanRenderer.pipelineLayout, 0, 1, &vulkanRenderer.descriptorSets[image], 0, nullptr);
 
 				unsigned int firstInstance = 0;
 				for (const auto& [geometry, instanceCount] : drawInstructions)
