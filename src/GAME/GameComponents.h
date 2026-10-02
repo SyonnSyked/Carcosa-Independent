@@ -76,16 +76,6 @@ struct PickUp {
     float Amount = 0.0;
 };
 
-struct Player {
-    bool attackHeld = false;
-};
-
-struct Enemy {};
-
-struct Health {
-    float current, maximum;
-};
-
 struct DamageFlash {
     float remaining;
 };
@@ -105,18 +95,6 @@ struct HordeSpawner {
     float elapsed = 0;
     std::uint64_t spawned = 0;
 };
-
-struct Movement {
-    float speed;
-};
-struct MeleeAttack {
-    float damage, range, cooldown;
-    float remaining = 0;
-};
-
-struct Collidable {};
-struct Obstacle {};
-struct ToDestroy {};
 
 struct Transform {
     GW::MATH::GMATRIXF matrix;
