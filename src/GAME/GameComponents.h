@@ -10,11 +10,70 @@ namespace GAME
         float damage, range, cooldown;
         float remaining = 0;
     };
+	struct Class{
+		std::string Type;
+	};
 
 	struct Collidable {};
 	struct Obstacle {};
 	struct ToDestroy {};
+	struct BonusStats
+	{
+		float BonusDamage = 0.0;
+		float BonusHealth = 0.0;
+		float BonusSpeed = 0.0;
+		float CDR = 0.0;
+		float CritChance = 0.0;
+		float AttackSpeed = 0.0;
 
+		void increaseDamage(float amount)
+		{
+			BonusDamage+=amount;
+		}
+
+		void increaseHealth(float amount)
+		{
+			BonusHealth+=amount;
+		}
+
+		void increaseSpeed(float amount)
+		{
+			BonusSpeed+=amount;
+		}
+
+		void increaseCRD(float amount)
+		{
+			CDR+=amount;
+		}
+
+		void increaseCritChance(float amount)
+		{
+			CritChance+=amount;
+		}
+
+		void increaseAttackSpeed(float amount)
+		{
+			AttackSpeed+=amount;
+		}
+
+
+	};
+
+	enum class BounsStatPickUpType
+	{
+		BonusDamage,
+		BonusHealth,
+		BonusSpeed,
+		CDR,
+		CritChance,
+		AttackSpeed,
+	};
+
+	struct PickUp
+	{
+		BounsStatPickUpType Type = BounsStatPickUpType::BonusDamage;
+		float Amount = 0.0;
+	};
 
 	struct Transform
 	{
