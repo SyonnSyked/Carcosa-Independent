@@ -1,4 +1,4 @@
-# YELLOWTEAMGAME
+# Carcosa
 
 A Windows C++20 game prototype for Project & Portfolio V. The current scene has a player, enemies that chase and attack, a configurable horde spawner, and a brief flash when characters take damage. It uses Gateware for window and input handling, Vulkan for rendering, and EnTT's entity-component system (ECS) to organize gameplay state. Levels come from Blender-exported JSON and H2B models; gameplay settings live in an INI file.
 
@@ -21,7 +21,16 @@ cmake --build --preset dev
 .\scripts\run
 ```
 
-The run script launches `build/dev/YELLOWTEAMGAME.exe` with the repository root as its working directory, so it reads the source configuration, shaders, and assets. Each build also copies that data beside the executable, including builds after data-only edits. To use those copies, launch the executable with `build/dev` as its working directory. CMake writes the clangd compilation database to `build/dev`; the project-local `.clangd` points clangd there.
+The run script launches `build/dev/Carcosa.exe`. Each build automatically copies configuration, shaders, and assets beside the executable, including builds after data-only edits. The game resolves those resources from its executable directory regardless of the launch working directory. CMake writes the clangd compilation database to `build/dev`; the project-local `.clangd` points clangd there.
+
+## Official Release submission
+
+```powershell
+cmake --preset release
+cmake --build --preset release --target package_game
+```
+
+This builds Release, recreates `build/release/distribution`, and creates `build/release/Carcosa.zip`. The ZIP contains `bin/Carcosa.exe`, redistributable runtime DLLs, `assets/`, `config/`, compiled `shaders/*.spv`, and `ReadMe.txt`. No development or shader source is included. Extract the entire ZIP and launch `bin/Carcosa.exe`; resources resolve from its parent directory. Windows and a Vulkan-capable graphics driver are required; the Vulkan SDK is only needed to build/package. Development builds retain runtime HLSL compilation.
 
 ## Layout
 

@@ -7,6 +7,28 @@
 int main()
 {
     try {
+        // Resolve resources from the executable, never from the launch directory.
+        std::vector<wchar_t> executablePath(1024);
+        DWORD length = 0;
+        for (;;) {
+            length = GetModuleFileNameW(nullptr, executablePath.data(),
+                                        static_cast<DWORD>(executablePath.size()));
+            if (length == 0)
+                throw std::runtime_error("Could not locate the game executable");
+            if (length < executablePath.size())
+                break;
+            executablePath.resize(executablePath.size() * 2);
+        }
+        const auto executableDirectory =
+            std::filesystem::path(std::wstring(executablePath.data(), length)).parent_path();
+        const auto resourceRoot = executableDirectory.filename() == L"bin"
+                                      ? executableDirectory.parent_path()
+                                      : executableDirectory;
+        if (!std::filesystem::is_regular_file(resourceRoot / "config/game.ini"))
+            throw std::runtime_error("Missing configuration beside the game: " +
+                                     resourceRoot.string());
+        std::filesystem::current_path(resourceRoot);
+
         entt::registry registry;
         CCL::InitializeComponentLogic(registry);
 

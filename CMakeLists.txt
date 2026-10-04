@@ -53,7 +53,7 @@ add_custom_target(
     COMMENT "Copying runtime configuration, shaders, and assets")
 add_dependencies(${PROJECT_NAME} copy_runtime_content)
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
-set_target_properties(${PROJECT_NAME} PROPERTIES CXX_EXTENSIONS OFF)
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_EXTENSIONS OFF OUTPUT_NAME "Carcosa")
 target_compile_definitions(${PROJECT_NAME} PRIVATE UNICODE _UNICODE $<$<CONFIG:Debug>:DEBUG>)
 target_compile_options(${PROJECT_NAME} PRIVATE /MD)
 target_include_directories(
@@ -75,22 +75,27 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${PROJECT_SOURCES} ${PROJE
 set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
 
 # Release Distribution
-
-set(GAME_DISTRIBUTION_DIR "${CMAKE_BINARY_DIR}/distribution")
-
-add_custom_target(
-    package_game
-    COMMAND ${CMAKE_COMMAND} -E rm -rf "${GAME_DISTRIBUTION_DIR}"
-    COMMAND ${CMAKE_COMMAND} -E make_directory "${GAME_DISTRIBUTION_DIR}/bin"
-    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:YELLOWTEAMGAME>" "${GAME_DISTRIBUTION_DIR}/bin/"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/assets"
-            "${GAME_DISTRIBUTION_DIR}/assets"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/config"
-            "${GAME_DISTRIBUTION_DIR}/config"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/shaders"
-            "${GAME_DISTRIBUTION_DIR}/shaders"
-    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/ReadMe.txt"
-            "${GAME_DISTRIBUTION_DIR}/ReadMe.txt"
-    DEPENDS YELLOWTEAMGAME
-    COMMENT "Creating clean game distribution"
-    VERBATIM)
+if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_CONFIGURATION_TYPES)
+    find_program(GAME_GLSLC glslc HINTS "$ENV{VULKAN_SDK}/Bin" REQUIRED)
+    find_file(VULKAN_LOADER vulkan-1.dll HINTS "$ENV{VULKAN_SDK}/Bin" REQUIRED)
+    get_filename_component(VULKAN_LOADER_DIR "${VULKAN_LOADER}" DIRECTORY)
+    set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP TRUE)
+    include(InstallRequiredSystemLibraries)
+    if(NOT CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS)
+        message(FATAL_ERROR "Microsoft redistributable runtime DLLs were not found")
+    endif()
+    configure_file(scripts/package_game.cmake.in package_game.cmake @ONLY)
+    add_custom_target(package_game
+        COMMAND ${CMAKE_COMMAND} "-DGAME_EXECUTABLE=$<TARGET_FILE:${PROJECT_NAME}>"
+                "-DGAME_CONFIGURATION=$<CONFIG>" -P "${CMAKE_BINARY_DIR}/package_game.cmake"
+        DEPENDS ${PROJECT_NAME}
+        COMMENT "Creating Release distribution and submission ZIP"
+        VERBATIM)
+else()
+    # Packaging from a development build still uses the official Release preset.
+    add_custom_target(package_game
+        COMMAND ${CMAKE_COMMAND} --preset release
+        COMMAND ${CMAKE_COMMAND} --build --preset release --target package_game
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        VERBATIM)
+endif()
