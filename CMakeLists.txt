@@ -42,20 +42,18 @@ set(PROJECT_SHADERS shaders/LevelVertex.hlsl shaders/LevelPixel.hlsl)
 set(CMAKE_NINJA_FORCE_RESPONSE_FILE ON)
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES} ${PROJECT_HEADERS} ${PROJECT_SHADERS})
-add_custom_target(copy_runtime_content ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/config"
+add_custom_target(
+    copy_runtime_content ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/config"
             "$<TARGET_FILE_DIR:${PROJECT_NAME}>/config"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
             "$<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/assets"
             "$<TARGET_FILE_DIR:${PROJECT_NAME}>/assets"
     COMMENT "Copying runtime configuration, shaders, and assets")
 add_dependencies(${PROJECT_NAME} copy_runtime_content)
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
-set_target_properties(${PROJECT_NAME} PROPERTIES CXX_EXTENSIONS OFF)
+set_target_properties(${PROJECT_NAME} PROPERTIES CXX_EXTENSIONS OFF OUTPUT_NAME "Carcosa")
 target_compile_definitions(${PROJECT_NAME} PRIVATE UNICODE _UNICODE $<$<CONFIG:Debug>:DEBUG>)
 target_compile_options(${PROJECT_NAME} PRIVATE /MD)
 target_include_directories(
@@ -75,3 +73,29 @@ set_source_files_properties(${PROJECT_SHADERS} PROPERTIES HEADER_FILE_ONLY TRUE 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${PROJECT_SOURCES} ${PROJECT_HEADERS}
                                                       ${PROJECT_SHADERS})
 set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
+
+# Release Distribution
+if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_CONFIGURATION_TYPES)
+    find_program(GAME_GLSLC glslc HINTS "$ENV{VULKAN_SDK}/Bin" REQUIRED)
+    find_file(VULKAN_LOADER vulkan-1.dll HINTS "$ENV{VULKAN_SDK}/Bin" REQUIRED)
+    get_filename_component(VULKAN_LOADER_DIR "${VULKAN_LOADER}" DIRECTORY)
+    set(CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS_SKIP TRUE)
+    include(InstallRequiredSystemLibraries)
+    if(NOT CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS)
+        message(FATAL_ERROR "Microsoft redistributable runtime DLLs were not found")
+    endif()
+    configure_file(scripts/package_game.cmake.in package_game.cmake @ONLY)
+    add_custom_target(package_game
+        COMMAND ${CMAKE_COMMAND} "-DGAME_EXECUTABLE=$<TARGET_FILE:${PROJECT_NAME}>"
+                "-DGAME_CONFIGURATION=$<CONFIG>" -P "${CMAKE_BINARY_DIR}/package_game.cmake"
+        DEPENDS ${PROJECT_NAME}
+        COMMENT "Creating Release distribution and submission ZIP"
+        VERBATIM)
+else()
+    # Packaging from a development build still uses the official Release preset.
+    add_custom_target(package_game
+        COMMAND ${CMAKE_COMMAND} --preset release
+        COMMAND ${CMAKE_COMMAND} --build --preset release --target package_game
+        WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+        VERBATIM)
+endif()
