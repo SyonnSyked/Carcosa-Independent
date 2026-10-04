@@ -42,15 +42,13 @@ set(PROJECT_SHADERS shaders/LevelVertex.hlsl shaders/LevelPixel.hlsl)
 set(CMAKE_NINJA_FORCE_RESPONSE_FILE ON)
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES} ${PROJECT_HEADERS} ${PROJECT_SHADERS})
-add_custom_target(copy_runtime_content ALL
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/config"
+add_custom_target(
+    copy_runtime_content ALL
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/config"
             "$<TARGET_FILE_DIR:${PROJECT_NAME}>/config"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/shaders"
             "$<TARGET_FILE_DIR:${PROJECT_NAME}>/shaders"
-    COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/assets"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/assets"
             "$<TARGET_FILE_DIR:${PROJECT_NAME}>/assets"
     COMMENT "Copying runtime configuration, shaders, and assets")
 add_dependencies(${PROJECT_NAME} copy_runtime_content)
@@ -75,3 +73,24 @@ set_source_files_properties(${PROJECT_SHADERS} PROPERTIES HEADER_FILE_ONLY TRUE 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${PROJECT_SOURCES} ${PROJECT_HEADERS}
                                                       ${PROJECT_SHADERS})
 set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
+
+# Release Distribution
+
+set(GAME_DISTRIBUTION_DIR "${CMAKE_BINARY_DIR}/distribution")
+
+add_custom_target(
+    package_game
+    COMMAND ${CMAKE_COMMAND} -E rm -rf "${GAME_DISTRIBUTION_DIR}"
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${GAME_DISTRIBUTION_DIR}/bin"
+    COMMAND ${CMAKE_COMMAND} -E copy "$<TARGET_FILE:YELLOWTEAMGAME>" "${GAME_DISTRIBUTION_DIR}/bin/"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/assets"
+            "${GAME_DISTRIBUTION_DIR}/assets"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/config"
+            "${GAME_DISTRIBUTION_DIR}/config"
+    COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_SOURCE_DIR}/shaders"
+            "${GAME_DISTRIBUTION_DIR}/shaders"
+    COMMAND ${CMAKE_COMMAND} -E copy_if_different "${CMAKE_SOURCE_DIR}/ReadMe.txt"
+            "${GAME_DISTRIBUTION_DIR}/ReadMe.txt"
+    DEPENDS YELLOWTEAMGAME
+    COMMENT "Creating clean game distribution"
+    VERBATIM)

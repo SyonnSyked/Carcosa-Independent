@@ -11,7 +11,27 @@
                 "CMAKE_CXX_COMPILER": "clang-cl",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
             }
+        },
+
+        {
+            "name": "release",
+            "displayName": "Release",
+            "generator": "Ninja",
+            "binaryDir": "${sourceDir}/build/release",
+            "cacheVariables": {
+                "CMAKE_BUILD_TYPE": "Release",
+                "CMAKE_C_COMPILER": "clang-cl",
+                "CMAKE_CXX_COMPILER": "clang-cl"
+            }
         }
     ],
-    "buildPresets": [{ "name": "dev", "configurePreset": "dev" }]
+    "buildPresets": [
+        { "name": "dev", "configurePreset": "dev" },
+        {
+            "name": "release",
+            "displayName": "Release Build",
+            "configurePreset": "release",
+            "jobs": 8
+        }
+    ]
 }
