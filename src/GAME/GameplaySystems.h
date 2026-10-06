@@ -12,9 +12,10 @@ void UpdateHordeSpawner(entt::registry &registry, float deltaTime);
 void TryWarriorAOE(entt::registry &registry, entt::entity player);
 void UpdateCombatTimers(entt::registry &registry, float deltaTime);
 void TryMeleeAttack(entt::registry &registry, entt::entity attacker, entt::entity target);
+void HandleEntityDeath(entt::registry &registry);
 void ApplyPickUp(entt::registry &registry, entt::entity player, const PickUp &pickup);
 void PickUpObject(entt::registry &registry, entt::entity player,
                   const GW::MATH::GVECTORF &playerPosition, float playerRadius);
-float GroundDistance(entt::registry &registry, entt::entity a, entt::entity b);
+void DropDungeonKey(entt::registry &registry, const Transform placement);
+void UseDungeonKey(entt::registry &registry, DungeonKey key);
 } // namespace GAME
-

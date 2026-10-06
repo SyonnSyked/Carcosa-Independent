@@ -208,5 +208,12 @@ entt::entity CreateEnemy(entt::registry &registry, const CharacterConfig &config
     return enemy;
 }
 
-} // namespace GAME
+float GroundDistance(entt::registry &registry, entt::entity a, entt::entity b)
+{
+    const auto &p = registry.get<Transform>(a).matrix.row4;
+    const auto &q = registry.get<Transform>(b).matrix.row4;
+    const float x = q.x - p.x, z = q.z - p.z;
+    return std::sqrt(x * x + z * z);
+}
 
+} // namespace GAME

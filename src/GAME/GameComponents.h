@@ -2,11 +2,25 @@
 #include <Gateware.h>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace GAME {
+
+struct Transform {
+    GW::MATH::GMATRIXF matrix;
+};
+
+struct Inventory {
+    std::vector<entt::entity> items;
+};
+
 struct Player {
     bool attackHeld = false;
     bool abilityHeld = false;
+
+    Transform location;
+
+    Inventory inventory;
 };
 struct WarriorAOE {
     float damage = 35.0f;
@@ -14,7 +28,12 @@ struct WarriorAOE {
     float cooldown = 3.0f;
     float remaining = 0.0f;
 };
-struct Enemy {};
+struct Enemy {
+    bool isBoss;
+
+    int whichKeyToDrop;
+};
+
 struct Health {
     float current, maximum;
 };
@@ -71,6 +90,8 @@ struct BonusStats {
     }
 };
 
+struct VampireQueen {};
+
 enum class BounsStatPickUpType {
     BonusDamage,
     BonusHealth,
@@ -78,6 +99,12 @@ enum class BounsStatPickUpType {
     CDR,
     CritChance,
     AttackSpeed,
+};
+
+struct DungeonKey {
+    int level;
+
+    float distToUse;
 };
 
 struct PickUp {
@@ -113,10 +140,6 @@ struct HordeSpawner {
     std::uint64_t spawned = 0;
 };
 
-struct Transform {
-    GW::MATH::GMATRIXF matrix;
-};
-
 struct Velocity {
     GW::MATH::GVECTORF vector;
 };
@@ -130,6 +153,10 @@ struct CharacterConfig {
 
     float health;
     float speed;
+};
+
+struct DungeonExit {
+    Transform location;
 };
 
 } // namespace GAME

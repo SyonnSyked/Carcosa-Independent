@@ -1,15 +1,12 @@
 #include "GameComponents.h"
+#include "GameManager.h"
 #include "GameplaySystems.h"
 
 namespace GAME {
 void UpdateEnemy(entt::registry &registry, float deltaTime)
 {
     for (auto player : registry.view<Player, Transform, Health>()) {
-        if (registry.get<Health>(player).current <= 0)
-            return;
         for (auto enemy : registry.view<Enemy, Transform, Movement, MeleeAttack, Health>()) {
-            if (registry.get<Health>(enemy).current <= 0)
-                continue;
             const float distance = GroundDistance(registry, enemy, player);
             const float range = registry.get<MeleeAttack>(enemy).range;
             if (distance > range) {
@@ -22,11 +19,8 @@ void UpdateEnemy(entt::registry &registry, float deltaTime)
                 position.z += (target.z - position.z) / distance * step;
             } else {
                 TryMeleeAttack(registry, enemy, player);
-                if (registry.get<Health>(player).current <= 0)
-                    return;
             }
         }
-        break;
     }
 }
 } // namespace GAME

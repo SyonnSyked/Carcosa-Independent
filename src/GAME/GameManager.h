@@ -13,4 +13,6 @@ entt::entity CreateRenderable(entt::registry &registry, const std::string &model
 
 entt::entity CreateEnemy(entt::registry &registry, const CharacterConfig &config,
                          const GW::MATH::GMATRIXF &placement);
+
+float GroundDistance(entt::registry &registry, entt::entity a, entt::entity b);
 } // namespace GAME
