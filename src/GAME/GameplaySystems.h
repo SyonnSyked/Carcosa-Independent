@@ -7,6 +7,7 @@ void ActivateDamageFlash(entt::registry &registry, entt::entity entity);
 void UpdateDamageFlash(entt::registry &registry, float deltaTime);
 void UpdatePlayer(entt::registry &registry, float deltaTime);
 void UpdateEnemy(entt::registry &registry, float deltaTime);
+void UpdateVampireQueen(entt::registry &registry, float deltaTime);
 void UpdateCamera(entt::registry &registry);
 void UpdateHordeSpawner(entt::registry &registry, float deltaTime);
 void TryWarriorAOE(entt::registry &registry, entt::entity player);
@@ -18,4 +19,6 @@ void PickUpObject(entt::registry &registry, entt::entity player,
                   const GW::MATH::GVECTORF &playerPosition, float playerRadius);
 void DropDungeonKey(entt::registry &registry, const Transform placement);
 void UseDungeonKey(entt::registry &registry, DungeonKey key);
+
+void TryVampiricDrain(entt::registry &registry, entt::entity target);
 } // namespace GAME

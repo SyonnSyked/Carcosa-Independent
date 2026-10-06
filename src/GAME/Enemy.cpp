@@ -6,7 +6,8 @@ namespace GAME {
 void UpdateEnemy(entt::registry &registry, float deltaTime)
 {
     for (auto player : registry.view<Player, Transform, Health>()) {
-        for (auto enemy : registry.view<Enemy, Transform, Movement, MeleeAttack, Health>()) {
+        for (auto enemy : registry.view<Enemy, Transform, Movement, MeleeAttack, Health>(
+                 entt::exclude<VampireQueen>)) {
             const float distance = GroundDistance(registry, enemy, player);
             const float range = registry.get<MeleeAttack>(enemy).range;
             if (distance > range) {

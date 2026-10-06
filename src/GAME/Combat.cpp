@@ -6,6 +6,10 @@ namespace GAME {
 
 void UpdateCombatTimers(entt::registry &registry, float deltaTime)
 {
+    for (auto entity : registry.view<VampiricDrainAttack>()) {
+        auto &timer = registry.get<VampiricDrainAttack>(entity).remaining;
+        timer = (std::max)(0.0f, timer - deltaTime);
+    }
     for (auto entity : registry.view<WarriorAOE>()) {
         auto &timer = registry.get<WarriorAOE>(entity).remaining;
         timer = (std::max)(0.0f, timer - deltaTime);
@@ -15,7 +19,6 @@ void UpdateCombatTimers(entt::registry &registry, float deltaTime)
         timer = (std::max)(0.0f, timer - deltaTime);
     }
 }
-
 void TryMeleeAttack(entt::registry &registry, entt::entity attacker, entt::entity target)
 {
     auto &attack = registry.get<MeleeAttack>(attacker);
@@ -36,6 +39,7 @@ void TryMeleeAttack(entt::registry &registry, entt::entity attacker, entt::entit
               << victim << " health: " << health.current << " / " << health.maximum << std::endl;
     HandleEntityDeath(registry);
 }
+
 void TryWarriorAOE(entt::registry &registry, entt::entity player)
 {
     if (!registry.valid(player) ||
@@ -63,13 +67,12 @@ void TryWarriorAOE(entt::registry &registry, entt::entity player)
 
 void HandleEntityDeath(entt::registry &registry)
 {
-    for (auto victim : registry.view<entt::entity, Transform, Health>(entt::exclude<ToDestroy>)) {
+    for (auto victim : registry.view<Transform, Health>(entt::exclude<ToDestroy>)) {
         auto &health = registry.get<Health>(victim);
         if (health.current <= 0) {
             if (registry.all_of<Enemy>(victim)) {
                 if (registry.get<Enemy>(victim).isBoss == true) {
                     DropDungeonKey(registry, registry.get<Transform>(victim));
-                    registry.emplace<ToDestroy>(victim);
                 }
             }
             registry.emplace<ToDestroy>(victim);

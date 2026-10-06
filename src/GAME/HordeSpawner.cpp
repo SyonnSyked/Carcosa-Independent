@@ -4,10 +4,8 @@
 #include <numbers>
 #include <random>
 
-namespace GAME
-{
-namespace
-{
+namespace GAME {
+namespace {
 entt::entity FindLivingSpawnPlayer(entt::registry &registry)
 {
     for (auto entity : registry.view<Player, Transform, Health>(entt::exclude<ToDestroy>)) {

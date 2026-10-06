@@ -49,6 +49,17 @@ CharacterConfig LoadCharacter(entt::registry &registry, const char *role)
     throw std::runtime_error("Gameplay object not loaded: " + config.model);
 }
 
+VampiricDrainAttack LoadVampiricDrain(const GameConfig &settings)
+{
+    VampiricDrainAttack drain{settings.RequireFloat("VampireQueen", "drainDamage"),
+                             settings.RequireFloat("VampireQueen", "drainLifeSteal"),
+                             settings.RequireFloat("VampireQueen", "drainRange"),
+                             settings.RequireFloat("VampireQueen", "drainCooldown")};
+    if (drain.damage < 0 || drain.lifeSteal < 0 || drain.range < 0 || drain.cooldown < 0)
+        throw std::runtime_error("Invalid VampireQueen drain tuning: values must be nonnegative");
+    return drain; // RequireFloat already rejects nonfinite values.
+}
+
 HordeSpawner LoadHordeSpawner(const GameConfig &settings)
 {
     const auto &tuning = settings.at("HordeSpawner");
@@ -168,6 +179,18 @@ void InitializeGameplay(entt::registry &registry)
     registry.emplace<WarriorAOE>(player);
     AttachCharacter(registry, player, playerConfig);
     CreateEnemy(registry, enemyConfig, enemyConfig.transform.matrix);
+    const auto drainConfig = LoadVampiricDrain(settings);
+    const auto queenModel = settings.at("VampireQueen").at("model").as<std::string>();
+    const auto *models = registry.ctx().find<DRAW::ModelManager>();
+    if (models && models->models.contains(queenModel) &&
+        !models->models.at(queenModel).meshEntities.empty()) {
+        const auto queenConfig = LoadCharacter(registry, "VampireQueen");
+        CreateVampireQueen(registry, queenConfig, drainConfig, queenConfig.transform.matrix);
+    } else {
+        std::cout << "Vampire Queen not spawned: missing dynamic Blender template " << queenModel
+                  << " in the selected level (export its H2B and object with gameType != none)."
+                  << std::endl;
+    }
     const auto spawnerEntity = registry.create();
     registry.emplace<HordeSpawner>(spawnerEntity, spawner);
     registry.emplace<Transform>(spawnerEntity, enemyConfig.transform);
@@ -184,6 +207,7 @@ void UpdateGameSystems(entt::registry &registry)
     UpdateCombatTimers(registry, deltaTime);
     UpdatePlayer(registry, deltaTime);
     UpdateEnemy(registry, deltaTime);
+    UpdateVampireQueen(registry, deltaTime);
     // Combat deaths free population slots now; new enemies begin AI next frame.
     // Spawn before mesh synchronization so new instances render at their placement immediately.
     UpdateHordeSpawner(registry, deltaTime);
@@ -206,6 +230,26 @@ entt::entity CreateEnemy(entt::registry &registry, const CharacterConfig &config
         throw;
     }
     return enemy;
+}
+
+entt::entity CreateVampireQueen(entt::registry &registry, const CharacterConfig &config,
+                               const VampiricDrainAttack &drain,
+                               const GW::MATH::GMATRIXF &placement)
+{
+    const auto queen = CreateRenderable(registry, config.model, placement);
+    try {
+        // whichKeyToDrop is currently unused; DropDungeonKey selects its existing model.
+        registry.emplace<Enemy>(queen, Enemy{true, 0});
+        registry.emplace<VampireQueen>(queen);
+        AttachCharacter(registry, queen, config);
+        auto attack = drain;
+        attack.remaining = 0;
+        registry.emplace<VampiricDrainAttack>(queen, attack);
+    } catch (...) {
+        registry.destroy(queen);
+        throw;
+    }
+    return queen;
 }
 
 float GroundDistance(entt::registry &registry, entt::entity a, entt::entity b)

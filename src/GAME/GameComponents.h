@@ -92,6 +92,12 @@ struct BonusStats {
 
 struct VampireQueen {};
 
+struct VampiricDrainAttack {
+    float damage, lifeSteal, range;
+    float cooldown;
+    float remaining = 0;
+};
+
 enum class BounsStatPickUpType {
     BonusDamage,
     BonusHealth,

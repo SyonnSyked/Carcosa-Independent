@@ -4,6 +4,10 @@
 #include <string>
 namespace GAME {
 struct CharacterConfig;
+struct VampiricDrainAttack;
+entt::entity CreateVampireQueen(entt::registry &registry, const CharacterConfig &config,
+                               const VampiricDrainAttack &drain,
+                               const GW::MATH::GMATRIXF &placement);
 void InitializeGameplay(entt::registry &registry);
 void UpdateGameSystems(entt::registry &registry);
 // Clone a loaded dynamic template by its exact Blender object name.
