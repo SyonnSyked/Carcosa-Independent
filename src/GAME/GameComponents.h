@@ -15,6 +15,18 @@ struct WarriorAOE {
     float remaining = 0.0f;
 };
 struct Enemy {};
+struct RangedAttack {
+    float damage = 10.0f;
+    float range = 6.0f;
+    float cooldown = 1.5f;
+    float remaining = 0.0f;
+};
+struct Projectile {
+    GW::MATH::GVECTORF velocity;
+    float damage;
+    float remaining = 2.0f;
+    float hitRadius = 0.65f;
+};
 struct Health {
     float current, maximum;
 };
