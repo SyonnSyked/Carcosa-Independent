@@ -55,7 +55,7 @@ add_dependencies(${PROJECT_NAME} copy_runtime_content)
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_20)
 set_target_properties(${PROJECT_NAME} PROPERTIES CXX_EXTENSIONS OFF OUTPUT_NAME "Carcosa")
 target_compile_definitions(${PROJECT_NAME} PRIVATE UNICODE _UNICODE $<$<CONFIG:Debug>:DEBUG>)
-target_compile_options(${PROJECT_NAME} PRIVATE /MD)
+target_compile_options(${PROJECT_NAME} PRIVATE /MD /EHsc)
 target_include_directories(
     ${PROJECT_NAME}
     PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}"

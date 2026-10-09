@@ -78,6 +78,7 @@ enum class BounsStatPickUpType {
     CDR,
     CritChance,
     AttackSpeed,
+    HealthRestore
 };
 
 struct PickUp {

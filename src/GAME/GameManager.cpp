@@ -167,6 +167,36 @@ void InitializeGameplay(entt::registry &registry)
     registry.emplace<Class>(player, Class{"Warrior"});
     registry.emplace<WarriorAOE>(player);
     AttachCharacter(registry, player, playerConfig);
+
+    // Testing the health pickup
+    const auto healthPotion = registry.create();
+
+    // Spawn it a little to the right of the player
+    auto potionTransform = playerConfig.transform;
+    potionTransform.matrix.row4.x += 3.0f;
+
+    // Set the pickup position
+    registry.emplace<Transform>(healthPotion, potionTransform);
+
+    // Health pickup restores 25 HP
+    registry.emplace<PickUp>(
+        healthPotion,
+        PickUp{ BounsStatPickUpType::HealthRestore, 25.0f }
+    );
+
+    // Lower player health for testing
+    auto& playerHealth = registry.get<Health>(player);
+    playerHealth.current = (std::max)(0.0f, playerHealth.maximum - 50.0f);
+
+    // Debug messages to check if everything works
+    std::cout << "TEST: Health potion spawned 3 units to the right!"
+        << std::endl;
+
+    std::cout << "TEST: Player HP is "
+        << playerHealth.current << "/"
+        << playerHealth.maximum << std::endl;
+
+    CreateEnemy(registry, enemyConfig, enemyConfig.transform.matrix);
     CreateEnemy(registry, enemyConfig, enemyConfig.transform.matrix);
     const auto spawnerEntity = registry.create();
     registry.emplace<HordeSpawner>(spawnerEntity, spawner);

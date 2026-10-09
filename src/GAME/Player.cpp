@@ -154,19 +154,19 @@ bool IsInputDown(GW::INPUT::GInput &input, int key)
     return value > 0;
 }
 
-void MovePlayer(entt::registry &registry, entt::entity player, GW::INPUT::GInput &input,
-                float deltaTime)
-{
-    const float x = float(IsInputDown(input, G_KEY_D)) - float(IsInputDown(input, G_KEY_A));
-    const float z = float(IsInputDown(input, G_KEY_W)) - float(IsInputDown(input, G_KEY_S));
-    const float length = std::sqrt(x * x + z * z);
-    if (length > 0) {
-        const float step = registry.get<Movement>(player).speed * deltaTime / length;
-        auto &position = registry.get<Transform>(player).matrix.row4;
-        position.x += x * step;
-        position.z += z * step;
+    void MovePlayer(entt::registry &registry, entt::entity player, GW::INPUT::GInput &input, float deltaTime)
+    {
+        const float x = float(IsInputDown(input, G_KEY_D)) - float(IsInputDown(input, G_KEY_A));
+        const float z = float(IsInputDown(input, G_KEY_W)) - float(IsInputDown(input, G_KEY_S));
+        const float length = std::sqrt(x * x + z * z);
+        if (length > 0) {
+              const float step = registry.get<Movement>(player).speed * deltaTime / length;
+              auto &position = registry.get<Transform>(player).matrix.row4;
+              position.x += x * step;
+              position.z += z * step;
+        }
     }
-}
+
 } // namespace
 
 void UpdatePlayer(entt::registry &registry, float deltaTime)
@@ -184,7 +184,20 @@ void UpdatePlayer(entt::registry &registry, float deltaTime)
             continue;
         // Pick against the camera and mesh transforms of the displayed frame, before movement.
         const auto target = pressed ? PickEnemy(registry) : entt::null;
+        // Move the player using keyboard input.
         MovePlayer(registry, entity, input, deltaTime);
+
+        // Get the player's current position.
+        const auto& playerPosition =
+            registry.get<Transform>(entity).matrix.row4;
+
+        // Set the player's pickup collection radius.
+        const float playerRadius = 1.0f;
+
+        // Check for nearby pickups and collect them.
+        PickUpObject(registry, entity, playerPosition, playerRadius);
+
+        // Activate the Warrior's special ability.
         if (abilityPressed)
             TryWarriorAOE(registry, entity);
         if (target != entt::null && registry.all_of<MeleeAttack>(entity) &&
