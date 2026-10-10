@@ -20,7 +20,14 @@ set(PROJECT_SOURCES
     "src/GAME/PickUp&Apply.cpp"
     src/GAME/GameManager.cpp
     src/UTIL/GameConfig.cpp
-    src/UTIL/Utilities.cpp)
+    src/UTIL/Utilities.cpp
+    include/imgui/imgui.cpp
+    include/imgui/imgui_draw.cpp
+    include/imgui/imgui_tables.cpp
+    include/imgui/imgui_widgets.cpp
+    include/imgui/backends/imgui_impl_vulkan.cpp
+    include/imgui/backends/imgui_impl_win32.cpp
+    )
 set(PROJECT_HEADERS
     precompiled.h
     src/APP/Window.hpp
@@ -33,7 +40,11 @@ set(PROJECT_HEADERS
     src/GAME/GameplaySystems.h
     src/GAME/GameManager.h
     src/UTIL/GameConfig.h
-    src/UTIL/Utilities.h)
+    src/UTIL/Utilities.h
+    include/imgui/imgui.h
+    include/imgui/backends/imgui_impl_vulkan.h
+    include/imgui/backends/imgui_impl_win32.h
+    )
 set(PROJECT_SHADERS shaders/LevelVertex.hlsl shaders/LevelPixel.hlsl)
 
 # Keep object filenames containing & out of the Windows linker shell command.
@@ -64,6 +75,8 @@ target_include_directories(
             "${CMAKE_CURRENT_SOURCE_DIR}/include/entt-3.13.1/single_include"
             "${CMAKE_CURRENT_SOURCE_DIR}/include/json-develop/single_include"
             "${CMAKE_CURRENT_SOURCE_DIR}/include/inifile-cpp-master/include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include/imgui"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include/imgui/backends"
             "$ENV{VULKAN_SDK}/Include")
 target_link_directories(${PROJECT_NAME} PRIVATE "$ENV{VULKAN_SDK}/Lib")
 target_precompile_headers(${PROJECT_NAME} PRIVATE precompiled.h)
