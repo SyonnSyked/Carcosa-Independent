@@ -68,7 +68,24 @@ enum class BounsStatPickUpType {
     CDR,
     CritChance,
     AttackSpeed,
+
 };
+
+enum class Screens 
+	{
+		MainMenu,
+		PauseMenu,
+		GameOverMenu,
+		Playing
+	};
+
+	
+
+	struct ActiveScreen
+	{
+		Screens Active;
+		bool Running = true;
+	};
 
 struct PickUp {
     BounsStatPickUpType Type = BounsStatPickUpType::BonusDamage;
