@@ -52,13 +52,17 @@ Code defines behavior; data defines scene content and tuning. Select the level a
 
 ```ini
 [Content]
-level=assets/levels/prototype.json
+level=assets/levels/Level1.json
 models=assets/models
 ```
 
-1. Create/place meshes in Blender. The included `dropper4blend.py` add-on exports scene JSON and OBJ/MTL models, and looks for `Obj2Header v1.9d.exe` in its `Models` export directory to convert models to H2B. The converter and Blender source files are **not bundled**; obtain the compatible converter from the team/course. An OBJ, FBX, or `.blend` file alone cannot be loaded by this application.
-2. Put the exported `.h2b` files in `assets/models`. Put the exported level JSON in `assets/levels/prototype.json`, or select another JSON filename in `[Content]`.
-3. Build and run using the commands above. No C++ edit or CMake asset list edit is required. Edit source assets/config, not the copies in `build/dev`.
+1. Save the Blender scene and install/enable the repository's `dropper4blend.py` add-on through Blender's add-on preferences. Author mesh geometry, material colors, and placement in Blender. Use **File > Export > Dropper** to export the world JSON; use JSON for this game's loader.
+2. For a model made from multiple mesh pieces, parent the pieces under one root and give the root a string custom property `exportModel`, such as `VampireCleric`. The root can be an Empty or a mesh. Dropper combines its descendant meshes into one model export, writes one JSON placement with combined bounds, and uses `exportModel` as the exported name. Put gameplay metadata such as `gameType` on that root. Do not nest roots that each have `exportModel`; each root must contain at least one mesh.
+3. Dropper writes OBJ/MTL files to `Models` beside the saved `.blend` file and looks for `Obj2Header v1.9d.exe` there to convert them to H2B. The converter and Blender source files are **not bundled**; obtain the compatible converter from the team/course. Check that the expected `.h2b` files were produced. An OBJ, FBX, or `.blend` file alone cannot be loaded by this application.
+4. Copy the exported `.h2b` files into `assets/models` and the world JSON into `assets/levels`. The current world is `Level1.json`; select another world through `[Content].level` when needed. Keep model names consistent between the JSON, H2B filenames, and the existing character/template settings in `game.ini`.
+5. Build and run using the commands above. Adding scenery or replacing an existing model does not require a C++ edit or a CMake asset-list edit. New behavior still belongs in GAME code. Edit source assets/config, not the copies in `build/dev`, and relaunch after content changes.
+
+Meshes without an `exportModel` root still use the individual-object export path. For grouped models, geometry is exported relative to the root while the JSON retains the root's world placement. Dropper restores the authoring transforms after export. Material colors travel through OBJ/MTL conversion into H2B; the current world shaders use those material values and lighting rather than image textures. The exporter supplies geometry and placement, not skeletal animation or gameplay logic.
 
 The existing loader expects a top-level `entities` array. Each mesh entry has `name`, `is_mesh: true`, `matrix` (16 flattened floats in the loader's Gateware row-major convention), and `bounds` (eight local-space XYZ corners in Blender bounding-box order). Let the compatible exporter produce coordinates/matrices; do not flatten Blender matrices arbitrarily. A loader-compatible placement record looks like this (it requires a real `Crate.h2b`):
 
@@ -86,7 +90,24 @@ The existing loader expects a top-level `entities` array. Each mesh entry has `n
 }
 ```
 
-Use dot-free base names: `Crate` and Blender duplicate `Crate.001` both resolve to `assets/models/Crate.h2b`. Placement comes from each entry's matrix; translation is floats 12-14. Duplicate/place objects in Blender and re-export to add world objects. Keep `gameType` absent or `"none"` for ordinary visible scenery. The loader groups metadata by H2B filename, so all instances of a base model must agree on static/dynamic flags. `staticCollidable` is optional existing metadata; no collision gameplay is provided.
+Use dot-free base names: `Crate` and Blender duplicate `Crate.001` both resolve to `assets/models/Crate.h2b`. An `exportModel` root should likewise use a dot-free model name without a filename extension. Placement comes from each entry's matrix; translation is floats 12-14. Duplicate/place objects in Blender and re-export to add world objects. Keep `gameType` absent or `"none"` for ordinary visible scenery. The loader groups metadata by H2B filename, so all instances of a base model must agree on static/dynamic flags. Set `staticCollidable` on static scenery that should also register as an obstacle; it does not assign an enemy or pickup role.
+
+Read the visual-content flow in order:
+
+1. `dropper4blend.py`: export names, custom properties, converted matrices, bounds, and model geometry.
+2. `src/DRAW/Utility/load_data_oriented.h`: read the selected JSON and matching H2B models into CPU geometry, materials, and placements. Missing model files are reported through the console and `LevelLoaderLog.txt`.
+3. `src/DRAW/Level.cpp`: upload the level's geometry, create visible static instances, and register dynamic models as hidden templates in `DRAW::ModelManager`.
+4. `src/GAME/GameManager.cpp`: use `CreateRenderable` to clone those templates for gameplay actors, then synchronize their owned meshes with their `Transform` components during updates.
+
+```text
+Blender geometry/materials/placement -> Dropper JSON + OBJ/MTL
+                                   -> converter H2B + selected level JSON
+                                   -> CPULevel -> GPULevel / ModelManager
+                                   -> static scenery or CreateRenderable instances
+                                   -> existing Vulkan world rendering
+```
+
+World shader sources remain in `shaders/LevelVertex.hlsl` and `shaders/LevelPixel.hlsl`, selected by `[Shaders]` in `game.ini`. Development builds compile HLSL at runtime. The existing Release packaging compiles SPIR-V and adjusts the packaged shader paths automatically; content authors do not need a separate shader-copy step.
 
 ## Gameplay reference
 
@@ -166,7 +187,7 @@ Enemies killed by a hit are removed before the next render, so lethal hits do no
 
 The existing rendering infrastructure supports creating multiple visible instances of a model already included in the exported Blender level.
 
-To make a model available for runtime instantiation, include it in the selected level JSON with `gameType` set to a value other than `"none"` (for example, `"renderable"`).
+To make a model available for runtime instantiation, include it in the selected level JSON with `gameType` set to a value other than `"none"` (for example, `"renderable"`). Set the custom property on the Blender object or `exportModel` root before exporting, and include its matching H2B file in the configured models directory.
 
 This marks the model as dynamic and registers its meshes as a hidden template during level loading. It does not automatically create a visible gameplay entity or assign gameplay behavior.
 
@@ -192,9 +213,38 @@ The returned EnTT entity contains a gameplay `Transform` and an owned `MeshColle
 
 Destroying the owning entity also destroys its associated mesh instances through the existing `MeshCollection` cleanup callback, without destroying the original template or other instances.
 
-The Player and Enemy creation paths already use this mechanism, with their model identifiers and initial placement obtained from the existing configuration and exported scene data.
+The Player, Enemy, and Vampire Queen creation paths already use this mechanism, with their model identifiers and initial placement obtained from the existing configuration and exported scene data. Ranged and wizard enemies reuse the Enemy template; `CreateEnemyVariant` attaches their existing attack components and changes only their owned material colors to orange or purple. The wizard's warning area uses the separately loaded `PurpleSpellEffect` template. Merely exporting a model does not attach those behaviors.
 
 Ordinary static scenery does not require GAME-side instantiation; the level loader creates its visible geometry directly.
+
+## ImGui menu presentation
+
+The Main, Pause, Game Over, and Victory screens share a Carcosa theme: dark parchment, antique gold, fine borders, and an original geometric seal. All decoration is drawn through Dear ImGui's existing draw lists. Typography uses the existing ImGui font at different sizes; no menu images, external fonts, or additional rendering framework are required.
+
+Menu presentation comes from required settings in `config/game.ini`:
+
+- `[MenuTheme]`: background, parchment, brass, gold, highlight, normal/muted text, danger accent, and normal/hovered/pressed button colors. Colors use normalized `R,G,B` components in `[0,1]`.
+- `[MenuLayout]`: panel width, button width/height/spacing, and title, heading, subtitle, footer, and button font sizes. Dimensions are scaled from the existing 1280x720 reference layout; supported ranges are documented beside the keys.
+- `[MainMenu]`, `[PauseMenu]`, `[GameOverMenu]`, and `[VictoryMenu]`: `title`, `subtitle`, `tagline`, `footer`, and the labels for each screen's existing actions.
+
+Edit the existing keys rather than replacing a whole section with a partial example. `LoadMenuSettings` validates every required value at startup; there are no C++ fallback titles, labels, palette colors, or configurable dimensions. Missing settings report their section/key, and invalid colors, dimensions, or labels stop startup with a diagnostic. Rebuild to copy the source INI beside the executable, then relaunch; menu settings are not reread every frame.
+
+Read the menu flow in order:
+
+1. `src/GAME/GameManager.cpp`, `ButtonStyleSetup` and `LoadMenuSettings`: load and validate the INI into cached `MenuSettings` and per-screen `MenuPresentation` data, then prepare menu-local colors.
+2. `RenderScreens`: dispatch the current screen to `DrawMainMenu`, `DrawPauseMenu`, `DrawGameOver`, or `DrawWinScreen`.
+3. `ScopedMenu`, `BeginMenu`, `DrawMenuFrame`, `DrawMenuSeal`, and `MenuText`: center the composition, draw shared ornamentation, and apply font/style settings. Scope ownership restores the ImGui stacks after each menu; long text is fitted to the available width.
+4. `MenuButton` and each screen function: draw native ImGui buttons with the configured labels while keeping the named `MenuAction` and its C++ action separate. Changing a label does not change which action runs.
+
+Main retains Start/Quit; Pause retains Resume/Main Menu/Quit; Game Over and Victory retain Main Menu/Restart. Using the correct dungeon key at the exit opens Victory. Restart uses the existing gameplay reset, and Start from the main menu resets a previously completed dungeon. Presentation edits do not change those state transitions or cleanup ownership.
+
+```text
+game.ini menu sections -> validated MenuSettings / MenuPresentation
+                      -> RenderScreens -> scoped menu helpers / native buttons
+                      -> existing ImGui frame -> existing Vulkan overlay submission
+```
+
+For text, palette, or supported sizing changes, edit the INI. For changes to the code-drawn ornament or composition, use the shared helpers in `GameManager.cpp` rather than duplicating drawing code in every screen. Leave ImGui context/backend setup, frame submission, descriptor pools, and shutdown in the existing application/renderer path.
 
 ## Protected infrastructure
 
