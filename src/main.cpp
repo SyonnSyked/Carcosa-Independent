@@ -3,6 +3,9 @@
 #include "APP/Window.hpp"
 #include "GAME/GameManager.h"
 #include "UTIL/Utilities.h"
+#include <windows.h>
+#include "imgui_impl_win32.h"
+#include "imgui_impl_vulkan.h"
 
 int main()
 {
@@ -59,6 +62,48 @@ int main()
         const auto camera = registry.create();
         registry.emplace<DRAW::Camera>(camera, DRAW::Camera{cameraMatrix});
 
+        registry.emplace<DRAW::VulkanRendererInitialization>(display,
+            DRAW::VulkanRendererInitialization{
+                settings.at("Shaders").at("vertex").as<std::string>(),
+                settings.at("Shaders").at("pixel").as<std::string>(),
+                {{0.04f, 0.06f, 0.09f, 1.0f}},
+                {1.0f, 0}, 65.0f, 0.1f, 1000.0f});
+        // bro idk wtf is this dog shit unity better
+            auto& renderer = registry.get<DRAW::VulkanRenderer>(display);
+             
+            void* rawInstance = nullptr;
+            renderer.vlkSurface.GetInstance(&rawInstance);
+
+            void* rawQueue = nullptr;
+            renderer.vlkSurface.GetGraphicsQueue(&rawQueue);
+
+            unsigned int graphicsId = 0,PresentId =0;
+            renderer.vlkSurface.GetQueueFamilyIndices(&graphicsId,&PresentId);
+
+            GW::SYSTEM::UNIVERSAL_WINDOW_HANDLE windowHand;
+            window.GetWindowHandle(windowHand);
+            HWND hwnd = static_cast<HWND>(windowHand.window);
+
+            ImGui::CreateContext();
+            ImGui_ImplWin32_Init(hwnd);
+
+            ImGui_ImplVulkan_InitInfo init_info = {};
+            init_info.Instance = static_cast<VkInstance>(rawInstance);
+            init_info.PhysicalDevice = renderer.physicalDevice;
+            init_info.Device = renderer.device;
+            init_info.QueueFamily = graphicsIdx;
+            init_info.Queue = static_cast<VkQueue>(rawQueue);
+            init_info.DescriptorPool = renderer.descriptorPool;
+            init_info.MinImageCount = 2;
+            init_info.ImageCount = 2;
+            init_info.PipelineInfoMain.RenderPass = renderer.renderPass;
+            init_info.PipelineInfoMain.Subpass = 0;
+            init_info.PipelineInfoMain.MSAASamples = VK_SAMPLE_COUNT_1_BIT;
+       
+            ImGui_ImplVulkan_Init(&init_info);
+            ButtonStyleSetup();
+        // end of the shit i tried to do
+
         registry.emplace<DRAW::VulkanRendererInitialization>(
             display, DRAW::VulkanRendererInitialization{
                          settings.at("Shaders").at("vertex").as<std::string>(),
@@ -86,6 +131,15 @@ int main()
             previous = now;
 
             GAME::UpdateGameSystems(registry);
+
+            ImGui_ImplVulkan_NewFrame();
+            ImGui_ImplWin32_NewFrame();
+            ImGui::NewFrame();
+
+            GAME::RenderScreens(registry);
+
+            ImGui::Render();
+
             registry.patch<APP::Window>(display);
         }
 

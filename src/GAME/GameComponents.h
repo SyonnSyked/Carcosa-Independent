@@ -139,6 +139,22 @@ struct HordeSpawner {
     std::uint64_t spawned = 0;
 };
 
+enum class Screens 
+	{
+		MainMenu,
+		PauseMenu,
+		GameOverMenu,
+		Playing
+	};
+
+	
+
+	struct ActiveScreen
+	{
+		Screens Active;
+		bool Running = true;
+	};
+
 struct Transform {
     GW::MATH::GMATRIXF matrix;
 };
@@ -159,3 +175,4 @@ struct CharacterConfig {
 };
 
 } // namespace GAME
+
