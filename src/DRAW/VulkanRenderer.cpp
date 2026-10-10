@@ -345,6 +345,22 @@ namespace DRAW
 		vulkanRenderer.vlkSurface.GetRenderPass((void**)&vulkanRenderer.renderPass);
 
 
+		if (std::filesystem::path(initializationData.vertexShaderName).extension() == ".spv" &&
+			std::filesystem::path(initializationData.fragmentShaderName).extension() == ".spv") {
+			auto loadCompiledShader = [&](const std::string& path, VkShaderModule& module) {
+				const auto bytes = ReadFileIntoString(path.c_str());
+				if (bytes.size() < 20 || bytes.size() % sizeof(uint32_t) != 0)
+					throw std::runtime_error("Invalid compiled shader: " + path);
+				std::vector<uint32_t> words(bytes.size() / sizeof(uint32_t));
+				std::memcpy(words.data(), bytes.data(), bytes.size());
+				if (words.front() != 0x07230203)
+					throw std::runtime_error("Invalid SPIR-V shader: " + path);
+				GvkHelper::create_shader_module(vulkanRenderer.device, bytes.size(),
+					reinterpret_cast<char*>(words.data()), &module);
+			};
+			loadCompiledShader(initializationData.vertexShaderName, vulkanRenderer.vertexShader);
+			loadCompiledShader(initializationData.fragmentShaderName, vulkanRenderer.fragmentShader);
+		} else {
 		shaderc_compiler_t compiler = shaderc_compiler_initialize();
 		shaderc_compile_options_t options = shaderc_compile_options_initialize();
 		shaderc_compile_options_set_source_language(options, shaderc_source_language_hlsl);
@@ -394,6 +410,7 @@ namespace DRAW
 
 		shaderc_compile_options_release(options);
 		shaderc_compiler_release(compiler);
+		}
 
 		InitializeGraphicsPipeline(registry, entity);
 
@@ -476,7 +493,10 @@ namespace DRAW
 				registry.emplace<std::vector<GPUInstance>>(entity, std::move(gpuInstances));
 				registry.patch<VulkanGPUInstanceBuffer>(entity);
 
-				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanRenderer.pipelineLayout, 0, 1, &vulkanRenderer.descriptorSets[frame], 0, nullptr);
+				// Uploads use the acquired image index; command buffers use the rotating frame index.
+				unsigned int image;
+				vulkanRenderer.vlkSurface.GetSwapchainCurrentImage(image);
+				vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vulkanRenderer.pipelineLayout, 0, 1, &vulkanRenderer.descriptorSets[image], 0, nullptr);
 
 				unsigned int firstInstance = 0;
 				for (const auto& [geometry, instanceCount] : drawInstructions)

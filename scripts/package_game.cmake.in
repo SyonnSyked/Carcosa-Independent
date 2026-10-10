@@ -1,0 +1,79 @@
+cmake_minimum_required(VERSION 3.25)
+if(NOT GAME_CONFIGURATION STREQUAL "Release")
+    message(FATAL_ERROR "The submission must be built with --config Release")
+endif()
+set(source "@CMAKE_SOURCE_DIR@")
+set(destination "@CMAKE_BINARY_DIR@/distribution")
+set(archive "@CMAKE_BINARY_DIR@/Carcosa.zip")
+
+# This generated script owns only the fixed distribution directory in the build tree.
+file(REMOVE_RECURSE "${destination}")
+file(REMOVE "${archive}")
+file(MAKE_DIRECTORY "${destination}/bin" "${destination}/shaders")
+file(COPY "${GAME_EXECUTABLE}" DESTINATION "${destination}/bin")
+
+# CMake discovers the compiler's redistributables; do not rely on the developer's PATH.
+set(runtime_libraries "@CMAKE_INSTALL_SYSTEM_RUNTIME_LIBS@")
+file(COPY ${runtime_libraries} DESTINATION "${destination}/bin")
+set(runtime_directories)
+foreach(library IN LISTS runtime_libraries)
+    get_filename_component(directory "${library}" DIRECTORY)
+    list(APPEND runtime_directories "${directory}")
+endforeach()
+file(GET_RUNTIME_DEPENDENCIES
+    EXECUTABLES "${GAME_EXECUTABLE}"
+    DIRECTORIES ${runtime_directories} "@VULKAN_LOADER_DIR@"
+    RESOLVED_DEPENDENCIES_VAR resolved
+    UNRESOLVED_DEPENDENCIES_VAR unresolved
+    PRE_EXCLUDE_REGEXES "^[Aa][Pp][Ii]-" "^[Ee][Xx][Tt]-"
+    POST_EXCLUDE_REGEXES "[Ww][Ii][Nn][Dd][Oo][Ww][Ss]/[Ss][Yy][Ss][Tt][Ee][Mm]32/.*")
+if(unresolved)
+    message(FATAL_ERROR "Unresolved runtime dependencies: ${unresolved}")
+endif()
+foreach(library IN LISTS resolved)
+    file(TO_CMAKE_PATH "${library}" normalized)
+    string(TOLOWER "${normalized}" normalized)
+    if(normalized MATCHES "/windows/system32/")
+        continue()
+    endif()
+    file(COPY "${library}" DESTINATION "${destination}/bin")
+endforeach()
+# Vulkan's loader is dynamically linked. Drivers remain an OS prerequisite.
+file(COPY "@VULKAN_LOADER@" DESTINATION "${destination}/bin")
+
+# Only runtime data formats are allowed into the submission.
+foreach(content IN ITEMS assets config)
+    file(MAKE_DIRECTORY "${destination}/${content}")
+    file(GLOB_RECURSE files RELATIVE "${source}" "${source}/${content}/*")
+    foreach(relative IN LISTS files)
+        if(relative MATCHES "(^|/)\\.gitkeep$")
+            continue()
+        endif()
+        if(NOT relative MATCHES "\\.(json|h2b|ini)$" OR relative MATCHES "(^|/)\\.")
+            message(FATAL_ERROR "Unexpected development/non-runtime file: ${relative}")
+        endif()
+        get_filename_component(parent "${relative}" DIRECTORY)
+        file(COPY "${source}/${relative}" DESTINATION "${destination}/${parent}")
+    endforeach()
+endforeach()
+
+# Use the same shaderc frontend and default options as runtime HLSL compilation.
+foreach(stage IN ITEMS vertex fragment)
+    if(stage STREQUAL "vertex")
+        set(name LevelVertex)
+    else()
+        set(name LevelPixel)
+    endif()
+    execute_process(COMMAND "@GAME_GLSLC@" -x hlsl "-fshader-stage=${stage}"
+        -fentry-point=main "${source}/shaders/${name}.hlsl"
+        -o "${destination}/shaders/${name}.spv" COMMAND_ERROR_IS_FATAL ANY)
+endforeach()
+file(READ "${destination}/config/game.ini" configuration)
+string(REPLACE "shaders/LevelVertex.hlsl" "shaders/LevelVertex.spv" configuration "${configuration}")
+string(REPLACE "shaders/LevelPixel.hlsl" "shaders/LevelPixel.spv" configuration "${configuration}")
+file(WRITE "${destination}/config/game.ini" "${configuration}")
+file(COPY "${source}/ReadMe.txt" DESTINATION "${destination}")
+execute_process(COMMAND "@CMAKE_COMMAND@" -E tar cf "${archive}" --format=zip
+    bin assets config shaders ReadMe.txt WORKING_DIRECTORY "${destination}"
+    COMMAND_ERROR_IS_FATAL ANY)
+message(STATUS "Submission ZIP: ${archive}")
