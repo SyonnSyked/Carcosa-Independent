@@ -89,9 +89,10 @@ void UseDungeonKey(entt::registry &registry)
     if (key.level != state.level || GroundDistance(registry, door, player) > key.distToUse)
         return;
     registry.remove<DungeonKey>(player);
-    // Keep the exit visible while the completed dungeon waits for a future screen.
+    // Completion freezes gameplay while the win screen offers the next action.
     state.complete = true;
-    std::cout << "Dungeon " << state.level << " COMPLETE: key consumed, gameplay paused at exit."
+    ChangeScreen(Screens::WinMenu);
+    std::cout << "Dungeon " << state.level << " COMPLETE: key consumed, win screen opened."
               << std::endl;
 }
 } // namespace GAME

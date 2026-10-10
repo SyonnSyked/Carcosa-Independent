@@ -22,9 +22,10 @@ extern ImGuiStyle buttonStyle;
 extern ButtonDim buttonDiemension;
 
 void ChangeScreen(Screens s);
-void DrawMainMenu();
+void DrawMainMenu(entt::registry &registry);
 void DrawPauseMenu();
 void DrawGameOver(entt::registry &registry);
+void DrawWinScreen(entt::registry &registry);
 void RenderScreens(entt::registry &registry);
 void DrawBlackWindow();
 void ButtonStyleSetup();
@@ -43,6 +44,8 @@ entt::entity CreateRenderable(entt::registry &registry, const std::string &model
                               const GW::MATH::GMATRIXF &transform);
 entt::entity CreateEnemy(entt::registry &registry, const CharacterConfig &config,
                          const GW::MATH::GMATRIXF &placement);
+entt::entity CreateEnemyVariant(entt::registry &registry, const CharacterConfig &config,
+                                const GW::MATH::GMATRIXF &placement, EnemyVariant variant);
 
 float GroundDistance(entt::registry &registry, entt::entity a, entt::entity b);
 } // namespace GAME

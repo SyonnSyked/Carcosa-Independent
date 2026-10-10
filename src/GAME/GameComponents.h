@@ -34,6 +34,8 @@ struct Enemy {
     int whichKeyToDrop;
 };
 
+enum class EnemyVariant { Melee, Ranged, Wizard };
+
 struct WizardAttack {
     float damage = 15.0f;
     float range = 7.0f;
@@ -185,6 +187,9 @@ struct HordeSpawner {
     int totalSpawnLimit; // Zero means unlimited; counts only this spawner's creations.
     float elapsed = 0;
     std::uint64_t spawned = 0;
+    float meleeWeight = 1;
+    float rangedWeight = 1;
+    float wizardWeight = 1;
 };
 
 enum class Screens 
@@ -192,7 +197,8 @@ enum class Screens
 		MainMenu,
 		PauseMenu,
 		GameOverMenu,
-		Playing
+		Playing,
+		WinMenu
 	};
 
 	
@@ -224,4 +230,3 @@ struct DungeonExit {
 };
 
 } // namespace GAME
-
