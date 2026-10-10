@@ -1,8 +1,18 @@
 #pragma once
+#include <Gateware.h>
+#include <cstdint>
+#include <string>
 
 namespace GAME {
 struct Player {
     bool attackHeld = false;
+    bool abilityHeld = false;
+};
+struct WarriorAOE {
+    float damage = 35.0f;
+    float radius = 3.0f;
+    float cooldown = 3.0f;
+    float remaining = 0.0f;
 };
 struct Enemy {};
 struct Health {
@@ -68,7 +78,39 @@ enum class BounsStatPickUpType {
     CDR,
     CritChance,
     AttackSpeed,
+};
 
+struct PickUp {
+    BounsStatPickUpType Type = BounsStatPickUpType::BonusDamage;
+    float Amount = 0.0;
+};
+
+struct PickupConfig {
+    float collectionAllowance; // World units added to the caller's player radius.
+};
+
+struct GameplayCameraConfig {
+    GW::MATH::GVECTORF offset;
+};
+
+struct DamageFlash {
+    float remaining;
+};
+
+struct DamageFeedbackConfig {
+    bool enabled;
+    float duration;
+    float flashR, flashG, flashB;
+};
+
+struct HordeSpawner {
+    bool enabled;
+    float spawnInterval;
+    float minimumRadius, maximumRadius;
+    int maximumAlive;
+    int totalSpawnLimit; // Zero means unlimited; counts only this spawner's creations.
+    float elapsed = 0;
+    std::uint64_t spawned = 0;
 };
 
 enum class Screens 
@@ -87,11 +129,6 @@ enum class Screens
 		bool Running = true;
 	};
 
-struct PickUp {
-    BounsStatPickUpType Type = BounsStatPickUpType::BonusDamage;
-    float Amount = 0.0;
-};
-
 struct Transform {
     GW::MATH::GMATRIXF matrix;
 };
@@ -100,4 +137,16 @@ struct Velocity {
     GW::MATH::GVECTORF vector;
 };
 
+struct CharacterConfig {
+    // Initialization recipe, not live ECS state. Transform preserves exported scale/orientation.
+    MeleeAttack attackData;
+    Transform transform;
+
+    std::string model;
+
+    float health;
+    float speed;
+};
+
 } // namespace GAME
+
