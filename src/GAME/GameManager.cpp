@@ -231,7 +231,7 @@ void InitializeGameplay(entt::registry &registry)
               << std::endl;
 }
 
-void RestartGame(entt::registry &registry) // needs to destroy everything and then call init
+void RestartGame(entt::registry &registry)
 {
     // Keep window, renderer, level geometry and hidden model templates alive.
     std::vector<entt::entity> gameplayEntities;
@@ -246,6 +246,8 @@ void RestartGame(entt::registry &registry) // needs to destroy everything and th
     collect(registry.view<HordeSpawner>());
     collect(registry.view<DungeonKey>());
     collect(registry.view<DungeonExit>());
+    collect(registry.view<PickUp>());
+    collect(registry.view<ToDestroy>());
     for (auto entity : gameplayEntities)
         if (registry.valid(entity))
             registry.destroy(entity); // MeshCollection owns each actor's visible meshes.
@@ -282,8 +284,20 @@ void UpdateGameSystems(entt::registry &registry)
     UpdatePlayer(registry, deltaTime);
     // Age existing warnings before creating new ones so each gets its full delay.
     UpdateSpellAreas(registry, deltaTime);
+    if (CurrentState.ActiveScreen != Screens::Playing) {
+        DestroyPendingEntities(registry);
+        return;
+    }
     UpdateEnemy(registry, deltaTime);
+    if (CurrentState.ActiveScreen != Screens::Playing) {
+        DestroyPendingEntities(registry);
+        return;
+    }
     UpdateProjectiles(registry, deltaTime);
+    if (CurrentState.ActiveScreen != Screens::Playing) {
+        DestroyPendingEntities(registry);
+        return;
+    }
     UpdateVampireQueen(registry, deltaTime);
     if (CurrentState.ActiveScreen != Screens::Playing) {
         DestroyPendingEntities(registry);
@@ -680,10 +694,7 @@ void DrawMainMenu(entt::registry &registry)
 {
     ScopedMenu menu("##mainmenu", menuSettings.mainMenu, true);
     if (menu.Button(MenuAction::Start)) {
-        if (registry.ctx().get<DungeonState>().complete)
-            RestartGame(registry);
-        else
-            ChangeScreen(Screens::Playing);
+        RestartGame(registry);
     }
     if (menu.Button(MenuAction::Quit))
         CurrentState.Running = false;

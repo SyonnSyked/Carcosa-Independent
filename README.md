@@ -236,7 +236,9 @@ Read the menu flow in order:
 3. `ScopedMenu`, `BeginMenu`, `DrawMenuFrame`, `DrawMenuSeal`, and `MenuText`: center the composition, draw shared ornamentation, and apply font/style settings. Scope ownership restores the ImGui stacks after each menu; long text is fitted to the available width.
 4. `MenuButton` and each screen function: draw native ImGui buttons with the configured labels while keeping the named `MenuAction` and its C++ action separate. Changing a label does not change which action runs.
 
-Main retains Start/Quit; Pause retains Resume/Main Menu/Quit; Game Over and Victory retain Main Menu/Restart. Using the correct dungeon key at the exit opens Victory. Restart uses the existing gameplay reset, and Start from the main menu resets a previously completed dungeon. Presentation edits do not change those state transitions or cleanup ownership.
+Main retains Start/Quit; Pause retains Resume/Main Menu/Quit; Game Over and Victory retain Main Menu/Restart. Using the correct dungeon key at the exit opens Victory. Start always creates a fresh run, including after death, victory, or leaving a paused run. Resume preserves the paused run. Start and Restart remove actors and their owned meshes, projectiles, spell areas, keys, exits, pickups, and pending deletions before recreating gameplay. Presentation edits do not change those state transitions or cleanup ownership.
+
+To run the deterministic gameplay/menu regression checks: `cmake --preset dev -DCARCOSA_BUILD_TESTS=ON`, `cmake --build --preset dev`, then `ctest --test-dir build/dev --output-on-failure`. These checks click actual ImGui menu buttons and exercise repeated death/reset, pause/resume, boss/key/victory, transient cleanup, and both Quit actions without opening a GPU window.
 
 ```text
 game.ini menu sections -> validated MenuSettings / MenuPresentation
