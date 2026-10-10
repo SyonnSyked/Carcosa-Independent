@@ -3,8 +3,13 @@
 #include "../UTIL/Utilities.h"
 #include "GameComponents.h"
 #include "GameplaySystems.h"
+#include "imgui.h"
 
 namespace GAME {
+GameState CurrentState;
+ImGuiStyle buttonStyle;
+ButtonDim buttonDiemension;
+
 namespace {
 void AttachCharacter(entt::registry &registry, entt::entity entity, const CharacterConfig &config)
 {
@@ -193,28 +198,30 @@ void InitializeGameplay(entt::registry &registry)
               << std::endl;
 }
 
-void UpdateGameSystems(entt::registry& registry)
-    std::cout << "Gameplay ready: WASD moves, left-click an enemy in melee range to attack."
-              << std::endl;
-
-
-
-
-}
-
 void ButtonStyleSetup()
-void UpdateGameSystems(entt::registry &registry)
 {
     buttonStyle = ImGui::GetStyle();
     buttonStyle.Colors[ImGuiCol_Button] = ImVec4(1.0f,1.0f,1.0f,1.0f);
     buttonStyle.Colors[ImGuiCol_ButtonHovered] = ImVec4(1.0f,0.0f,0.0f,1.0f);
     buttonStyle.Colors[ImGuiCol_ButtonActive] = ImVec4(0.0f,1.0f,0.0f,1.0f);
-
 }
 
 void RestartGame(entt::registry &registry) // needs to destroy everything and then call init
 {
-    registry.clear();
+    // Keep window, renderer, level geometry and hidden model templates alive.
+    std::vector<entt::entity> gameplayEntities;
+    auto collect = [&](auto view) {
+        for (auto entity : view)
+            gameplayEntities.push_back(entity);
+    };
+    collect(registry.view<Player>());
+    collect(registry.view<Enemy>());
+    collect(registry.view<Projectile>());
+    collect(registry.view<SpellArea>());
+    collect(registry.view<HordeSpawner>());
+    for (auto entity : gameplayEntities)
+        if (registry.valid(entity))
+            registry.destroy(entity); // MeshCollection owns each actor's visible meshes.
     InitializeGameplay(registry);
     ChangeScreen(Screens::Playing);
 }
@@ -223,28 +230,21 @@ void RestartGame(entt::registry &registry) // needs to destroy everything and th
 
 
 void UpdateGameSystems(entt::registry &registry)
-
 {
     static bool prevEscaped = false;
     float state = 0.0f;
-    gInput.GetState(G_KEY_ESCAPE, state);
-    bool pressed = (state > 0.0f) && !prevEscaped;
-    prevEscaped = (state > 0.0f);
-
-    if (pressed)
-    {
-        if(CurrentState.ActiveScreen == Screens::Playing)
+    registry.ctx().get<UTIL::Input>().immediateInput.GetState(G_KEY_ESCAPE, state);
+    const bool pressed = state > 0.0f && !prevEscaped;
+    prevEscaped = state > 0.0f;
+    if (pressed) {
+        if (CurrentState.ActiveScreen == Screens::Playing)
             ChangeScreen(Screens::PauseMenu);
         else if (CurrentState.ActiveScreen == Screens::PauseMenu)
             ChangeScreen(Screens::Playing);
-
     }
+    if (!CurrentState.Running || CurrentState.ActiveScreen != Screens::Playing)
+        return;
 
-
-    switch(CurrentState.ActiveScreen)
-    {
-        case(Screens::Playing)://normal run the gameplay shit
-        {
     const float deltaTime = static_cast<float>(registry.ctx().get<UTIL::DeltaTime>().dtSec);
     // Age previous flashes first; hits this frame get their full configured duration.
     UpdateDamageFlash(registry, deltaTime);
@@ -258,40 +258,6 @@ void UpdateGameSystems(entt::registry &registry)
     // Spawn before mesh synchronization so new instances render at their placement immediately.
     UpdateHordeSpawner(registry, deltaTime);
     UpdateCamera(registry);
-
-    for (auto entity : registry.view<Transform, Velocity>()) {
-        auto& transform = registry.get<Transform>(entity).matrix;
-        const auto& velocity = registry.get<Velocity>(entity).vector;
-        transform.row4.x += velocity.x * deltaTime;
-        transform.row4.y += velocity.y * deltaTime;
-        transform.row4.z += velocity.z * deltaTime;
-    IntegrateVelocity(registry, deltaTime);
-    SynchronizeMeshTransforms(registry);
-    DestroyPendingEntities(registry);
-        break;
-    }
-        case(Screens::PauseMenu):
-        case(Screens::MainMenu):
-        case(Screens::GameOverMenu):
-            break;
-
-    }
-
-
-
-}
-
-entt::entity CreateEnemy(entt::registry &registry, const CharacterConfig &config,
-                         const GW::MATH::GMATRIXF &placement)
-{
-    const auto enemy = CreateRenderable(registry, config.model, placement);
-    try {
-        registry.emplace<Enemy>(enemy);
-        AttachCharacter(registry, enemy, config);
-    } catch (...) {
-        registry.destroy(enemy); // Existing MeshCollection callback owns mesh cleanup.
-        throw;
-    }
     IntegrateVelocity(registry, deltaTime);
     SynchronizeMeshTransforms(registry);
     DestroyPendingEntities(registry);
@@ -458,6 +424,4 @@ void DrawBlackWindow()
 }
 
 
-}// namespace GAME
 } // namespace GAME
-

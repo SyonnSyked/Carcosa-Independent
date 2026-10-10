@@ -1,6 +1,8 @@
 #include "DrawComponents.h"
 #include "../CCL.h"
 #include <map>
+#include "imgui.h"
+#include "imgui_impl_vulkan.h"
 
 #include "./Utility/FileIntoString.h"
 
@@ -64,7 +66,8 @@ namespace DRAW
 		setCreateInfo.pBindings = layoutBinding;
 		setCreateInfo.flags = 0;
 		setCreateInfo.pNext = nullptr;
-		vkCreateDescriptorSetLayout(vulkanRenderer.device, &setCreateInfo, nullptr, &vulkanRenderer.descriptorLayout);
+		if (const auto result = vkCreateDescriptorSetLayout(vulkanRenderer.device, &setCreateInfo, nullptr, &vulkanRenderer.descriptorLayout); result != VK_SUCCESS)
+            throw std::runtime_error("Game descriptor layout creation failed: " + std::to_string(result));
 #pragma endregion
 
 #pragma region Descriptor Pool
@@ -79,7 +82,8 @@ namespace DRAW
 		descriptorpool_create_info.maxSets = frameCount;
 		descriptorpool_create_info.flags = 0;
 		descriptorpool_create_info.pNext = nullptr;
-		vkCreateDescriptorPool(vulkanRenderer.device, &descriptorpool_create_info, nullptr, &vulkanRenderer.descriptorPool);
+		if (const auto result = vkCreateDescriptorPool(vulkanRenderer.device, &descriptorpool_create_info, nullptr, &vulkanRenderer.descriptorPool); result != VK_SUCCESS)
+            throw std::runtime_error("Game descriptor pool creation failed: " + std::to_string(result));
 #pragma endregion
 
 #pragma region Allocate Descriptor Sets
@@ -91,7 +95,8 @@ namespace DRAW
 		allocateInfo.pNext = nullptr;
 		for (int i = 0; i < frameCount; i++)
 		{
-			vkAllocateDescriptorSets(vulkanRenderer.device, &allocateInfo, &vulkanRenderer.descriptorSets[i]);
+			if (const auto result = vkAllocateDescriptorSets(vulkanRenderer.device, &allocateInfo, &vulkanRenderer.descriptorSets[i]); result != VK_SUCCESS)
+                throw std::runtime_error("Game descriptor allocation failed: " + std::to_string(result));
 		}
 #pragma endregion
 
@@ -509,6 +514,10 @@ namespace DRAW
 			}
 		}
 
+        // Submit the menu overlay in the existing frame/render pass, after 3D geometry.
+        if (ImGui::GetCurrentContext() && ImGui::GetIO().BackendRendererUserData)
+            ImGui_ImplVulkan_RenderDrawData(ImGui::GetDrawData(), commandBuffer);
+
 		vulkanRenderer.vlkSurface.EndFrame(true);
 	}
 
@@ -519,7 +528,11 @@ namespace DRAW
 		if (vulkanRenderer.resourcesReleased)
 			return;
 
-		vkDeviceWaitIdle(vulkanRenderer.device);
+        if (const auto result = vkDeviceWaitIdle(vulkanRenderer.device); result != VK_SUCCESS)
+            throw std::runtime_error("Vulkan shutdown wait failed: " + std::to_string(result));
+        // Gateware can release resources on window close before main exits its loop.
+        if (ImGui::GetCurrentContext() && ImGui::GetIO().BackendRendererUserData)
+            ImGui_ImplVulkan_Shutdown();
 
 		registry.remove<VulkanIndexBuffer>(entity);
 		registry.remove<VulkanVertexBuffer>(entity);
