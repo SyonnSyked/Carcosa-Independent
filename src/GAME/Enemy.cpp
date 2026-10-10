@@ -78,10 +78,10 @@ void FireProjectile(entt::registry &registry, entt::entity enemy, entt::entity p
 } // namespace
 void UpdateEnemy(entt::registry &registry, float deltaTime)
 {
-    for (auto player : registry.view<Player, Transform, Health>()) {
+    for (auto player : registry.view<Player, Transform, Health>(entt::exclude<ToDestroy>)) {
         if (registry.get<Health>(player).current <= 0)
             return;
-        for (auto enemy : registry.view<Enemy, Transform, Movement, MeleeAttack, Health>(entt::exclude<ToDestroy>)) {
+        for (auto enemy : registry.view<Enemy, Transform, Movement, MeleeAttack, Health>(entt::exclude<ToDestroy, VampireQueen>)) {
             if (registry.get<Health>(enemy).current <= 0)
                 continue;
             const float distance = GroundDistance(registry, enemy, player);
@@ -165,6 +165,7 @@ void UpdateProjectiles(entt::registry &registry, float deltaTime)
         } else if (shot.remaining <= 0)
             registry.emplace<ToDestroy>(entity);
     }
+    HandleEntityDeath(registry);
 }
 void UpdateSpellAreas(entt::registry &registry, float deltaTime)
 {
@@ -204,5 +205,6 @@ void UpdateSpellAreas(entt::registry &registry, float deltaTime)
                       << health.current << " / " << health.maximum << std::endl;
         }
     }
+    HandleEntityDeath(registry);
 }
 } // namespace GAME

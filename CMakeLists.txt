@@ -15,11 +15,14 @@ set(PROJECT_SOURCES
     src/DRAW/VulkanBuffers.cpp
     src/DRAW/VulkanRenderer.cpp
     src/GAME/Player.cpp
+    src/GAME/Collision.cpp
     src/GAME/Enemy.cpp
+    src/GAME/Boss.cpp
     src/GAME/Combat.cpp
-    "src/GAME/PickUp&Apply.cpp"
+    src/GAME/PickUp&Apply.cpp
     src/GAME/DamageFeedback.cpp
     src/GAME/HordeSpawner.cpp
+    src/GAME/DungeonKeys.cpp
     src/GAME/GameManager.cpp
     src/UTIL/GameConfig.cpp
     src/UTIL/Utilities.cpp
@@ -98,7 +101,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_CONFIGURATION_TYPES)
         message(FATAL_ERROR "Microsoft redistributable runtime DLLs were not found")
     endif()
     configure_file(scripts/package_game.cmake.in package_game.cmake @ONLY)
-    add_custom_target(package_game
+    add_custom_target(
+        package_game
         COMMAND ${CMAKE_COMMAND} "-DGAME_EXECUTABLE=$<TARGET_FILE:${PROJECT_NAME}>"
                 "-DGAME_CONFIGURATION=$<CONFIG>" -P "${CMAKE_BINARY_DIR}/package_game.cmake"
         DEPENDS ${PROJECT_NAME}
@@ -106,7 +110,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_CONFIGURATION_TYPES)
         VERBATIM)
 else()
     # Packaging from a development build still uses the official Release preset.
-    add_custom_target(package_game
+    add_custom_target(
+        package_game
         COMMAND ${CMAKE_COMMAND} --preset release
         COMMAND ${CMAKE_COMMAND} --build --preset release --target package_game
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"

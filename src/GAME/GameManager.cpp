@@ -3,8 +3,13 @@
 #include "../UTIL/Utilities.h"
 #include "GameComponents.h"
 #include "GameplaySystems.h"
+#include "imgui.h"
 
 namespace GAME {
+GameState CurrentState;
+ImGuiStyle buttonStyle;
+ButtonDim buttonDiemension;
+
 namespace {
 void AttachCharacter(entt::registry &registry, entt::entity entity, const CharacterConfig &config)
 {
@@ -49,6 +54,17 @@ CharacterConfig LoadCharacter(entt::registry &registry, const char *role)
     throw std::runtime_error("Gameplay object not loaded: " + config.model);
 }
 
+VampiricDrainAttack LoadVampiricDrain(const GameConfig &settings)
+{
+    VampiricDrainAttack drain{settings.RequireFloat("VampireQueen", "drainDamage"),
+                             settings.RequireFloat("VampireQueen", "drainLifeSteal"),
+                             settings.RequireFloat("VampireQueen", "drainRange"),
+                             settings.RequireFloat("VampireQueen", "drainCooldown")};
+    if (drain.damage < 0 || drain.lifeSteal < 0 || drain.range < 0 || drain.cooldown < 0)
+        throw std::runtime_error("Invalid VampireQueen drain tuning: values must be nonnegative");
+    return drain; // RequireFloat already rejects nonfinite values.
+}
+
 HordeSpawner LoadHordeSpawner(const GameConfig &settings)
 {
     const auto &tuning = settings.at("HordeSpawner");
@@ -83,6 +99,10 @@ void InitializeGameplaySettings(entt::registry &registry, const GameConfig &sett
 
     registry.ctx().emplace<GameplayCameraConfig>(cameraConfig);
     registry.ctx().emplace<PickupConfig>(pickupConfig);
+    CollisionConfig collision{settings.RequireFloat("Collision", "playerRadius")};
+    if (collision.playerRadius <= 0)
+        throw std::runtime_error("Invalid Collision.playerRadius: must be positive and finite");
+    registry.ctx().emplace<CollisionConfig>(collision);
 }
 
 void IntegrateVelocity(entt::registry &registry, float deltaTime)
@@ -157,6 +177,7 @@ void InitializeGameplay(entt::registry &registry)
     const auto enemyConfig = LoadCharacter(registry, "Enemy");
     const auto spawner = LoadHordeSpawner(settings);
     InitializeGameplaySettings(registry, settings);
+    InitializeDungeonKeys(registry);
 
     // The shared recipe is parsed once. Each actor still owns independent ECS state.
     InitializeDamageFeedback(registry);
@@ -185,6 +206,18 @@ void InitializeGameplay(entt::registry &registry)
     registry.emplace<WizardAttack>(wizard);
     for (auto mesh : registry.get<DRAW::MeshCollection>(wizard).meshEntities)
         registry.get<DRAW::GPUInstance>(mesh).matData.Kd = {0.65f, 0.1f, 1.0f};
+    const auto drainConfig = LoadVampiricDrain(settings);
+    const auto queenModel = settings.at("VampireQueen").at("model").as<std::string>();
+    const auto *models = registry.ctx().find<DRAW::ModelManager>();
+    if (models && models->models.contains(queenModel) &&
+        !models->models.at(queenModel).meshEntities.empty()) {
+        const auto queenConfig = LoadCharacter(registry, "VampireQueen");
+        CreateVampireQueen(registry, queenConfig, drainConfig, queenConfig.transform.matrix);
+    } else {
+        std::cout << "Vampire Queen not spawned: missing dynamic Blender template " << queenModel
+                  << " in the selected level (export its H2B and object with gameType != none)."
+                  << std::endl;
+    }
     const auto spawnerEntity = registry.create();
     registry.emplace<HordeSpawner>(spawnerEntity, spawner);
     registry.emplace<Transform>(spawnerEntity, enemyConfig.transform);
@@ -193,28 +226,33 @@ void InitializeGameplay(entt::registry &registry)
               << std::endl;
 }
 
-void UpdateGameSystems(entt::registry& registry)
-    std::cout << "Gameplay ready: WASD moves, left-click an enemy in melee range to attack."
-              << std::endl;
-
-
-
-
-}
-
 void ButtonStyleSetup()
-void UpdateGameSystems(entt::registry &registry)
 {
     buttonStyle = ImGui::GetStyle();
     buttonStyle.Colors[ImGuiCol_Button] = ImVec4(1.0f,1.0f,1.0f,1.0f);
     buttonStyle.Colors[ImGuiCol_ButtonHovered] = ImVec4(1.0f,0.0f,0.0f,1.0f);
     buttonStyle.Colors[ImGuiCol_ButtonActive] = ImVec4(0.0f,1.0f,0.0f,1.0f);
-
 }
 
 void RestartGame(entt::registry &registry) // needs to destroy everything and then call init
 {
-    registry.clear();
+    // Keep window, renderer, level geometry and hidden model templates alive.
+    std::vector<entt::entity> gameplayEntities;
+    auto collect = [&](auto view) {
+        for (auto entity : view)
+            gameplayEntities.push_back(entity);
+    };
+    collect(registry.view<Player>());
+    collect(registry.view<Enemy>());
+    collect(registry.view<Projectile>());
+    collect(registry.view<SpellArea>());
+    collect(registry.view<HordeSpawner>());
+    collect(registry.view<DungeonKey>());
+    collect(registry.view<DungeonExit>());
+    for (auto entity : gameplayEntities)
+        if (registry.valid(entity))
+            registry.destroy(entity); // MeshCollection owns each actor's visible meshes.
+    registry.ctx().erase<DungeonState>();
     InitializeGameplay(registry);
     ChangeScreen(Screens::Playing);
 }
@@ -223,28 +261,23 @@ void RestartGame(entt::registry &registry) // needs to destroy everything and th
 
 
 void UpdateGameSystems(entt::registry &registry)
-
 {
     static bool prevEscaped = false;
     float state = 0.0f;
-    gInput.GetState(G_KEY_ESCAPE, state);
-    bool pressed = (state > 0.0f) && !prevEscaped;
-    prevEscaped = (state > 0.0f);
-
-    if (pressed)
-    {
-        if(CurrentState.ActiveScreen == Screens::Playing)
+    registry.ctx().get<UTIL::Input>().immediateInput.GetState(G_KEY_ESCAPE, state);
+    const bool pressed = state > 0.0f && !prevEscaped;
+    prevEscaped = state > 0.0f;
+    if (pressed) {
+        if (CurrentState.ActiveScreen == Screens::Playing)
             ChangeScreen(Screens::PauseMenu);
         else if (CurrentState.ActiveScreen == Screens::PauseMenu)
             ChangeScreen(Screens::Playing);
-
     }
+    if (!CurrentState.Running || CurrentState.ActiveScreen != Screens::Playing)
+        return;
 
-
-    switch(CurrentState.ActiveScreen)
-    {
-        case(Screens::Playing)://normal run the gameplay shit
-        {
+    if (registry.ctx().get<DungeonState>().complete)
+        return;
     const float deltaTime = static_cast<float>(registry.ctx().get<UTIL::DeltaTime>().dtSec);
     // Age previous flashes first; hits this frame get their full configured duration.
     UpdateDamageFlash(registry, deltaTime);
@@ -254,45 +287,18 @@ void UpdateGameSystems(entt::registry &registry)
     UpdateSpellAreas(registry, deltaTime);
     UpdateEnemy(registry, deltaTime);
     UpdateProjectiles(registry, deltaTime);
+    UpdateVampireQueen(registry, deltaTime);
+    if (CurrentState.ActiveScreen != Screens::Playing) {
+        DestroyPendingEntities(registry);
+        return;
+    }
     // Combat deaths free population slots now; new enemies begin AI next frame.
     // Spawn before mesh synchronization so new instances render at their placement immediately.
     UpdateHordeSpawner(registry, deltaTime);
     UpdateCamera(registry);
-
-    for (auto entity : registry.view<Transform, Velocity>()) {
-        auto& transform = registry.get<Transform>(entity).matrix;
-        const auto& velocity = registry.get<Velocity>(entity).vector;
-        transform.row4.x += velocity.x * deltaTime;
-        transform.row4.y += velocity.y * deltaTime;
-        transform.row4.z += velocity.z * deltaTime;
     IntegrateVelocity(registry, deltaTime);
-    SynchronizeMeshTransforms(registry);
-    DestroyPendingEntities(registry);
-        break;
-    }
-        case(Screens::PauseMenu):
-        case(Screens::MainMenu):
-        case(Screens::GameOverMenu):
-            break;
-
-    }
-
-
-
-}
-
-entt::entity CreateEnemy(entt::registry &registry, const CharacterConfig &config,
-                         const GW::MATH::GMATRIXF &placement)
-{
-    const auto enemy = CreateRenderable(registry, config.model, placement);
-    try {
-        registry.emplace<Enemy>(enemy);
-        AttachCharacter(registry, enemy, config);
-    } catch (...) {
-        registry.destroy(enemy); // Existing MeshCollection callback owns mesh cleanup.
-        throw;
-    }
-    IntegrateVelocity(registry, deltaTime);
+    CollectDungeonKey(registry);
+    UseDungeonKey(registry);
     SynchronizeMeshTransforms(registry);
     DestroyPendingEntities(registry);
 }
@@ -302,7 +308,7 @@ entt::entity CreateEnemy(entt::registry &registry, const CharacterConfig &config
 {
     const auto enemy = CreateRenderable(registry, config.model, placement);
     try {
-        registry.emplace<Enemy>(enemy);
+        registry.emplace<Enemy>(enemy, Enemy{false, 0});
         AttachCharacter(registry, enemy, config);
     } catch (...) {
         registry.destroy(enemy); // Existing MeshCollection callback owns mesh cleanup.
@@ -458,6 +464,32 @@ void DrawBlackWindow()
 }
 
 
-}// namespace GAME
-} // namespace GAME
+entt::entity CreateVampireQueen(entt::registry &registry, const CharacterConfig &config,
+                               const VampiricDrainAttack &drain,
+                               const GW::MATH::GMATRIXF &placement)
+{
+    const auto queen = CreateRenderable(registry, config.model, placement);
+    try {
+        // whichKeyToDrop is currently unused; DropDungeonKey selects its existing model.
+        registry.emplace<Enemy>(queen, Enemy{true, 0});
+        registry.emplace<VampireQueen>(queen);
+        AttachCharacter(registry, queen, config);
+        auto attack = drain;
+        attack.remaining = 0;
+        registry.emplace<VampiricDrainAttack>(queen, attack);
+    } catch (...) {
+        registry.destroy(queen);
+        throw;
+    }
+    return queen;
+}
 
+float GroundDistance(entt::registry &registry, entt::entity a, entt::entity b)
+{
+    const auto &p = registry.get<Transform>(a).matrix.row4;
+    const auto &q = registry.get<Transform>(b).matrix.row4;
+    const float x = q.x - p.x, z = q.z - p.z;
+    return std::sqrt(x * x + z * z);
+}
+
+} // namespace GAME
