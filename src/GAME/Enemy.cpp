@@ -2,6 +2,7 @@
 #include "GameManager.h"
 #include "GameComponents.h"
 #include "GameplaySystems.h"
+#include "../UTIL/Utilities.h"
 #include <algorithm>
 
 namespace GAME {
@@ -9,40 +10,24 @@ namespace {
 void CastSpellArea(entt::registry &registry, entt::entity player, const WizardAttack &attack)
 {
     const auto center = registry.get<Transform>(player).matrix.row4;
-    const auto area = registry.create();
+    const float heightOffset =
+        registry.ctx().get<UTIL::Config>().gameConfig->RequireFloat("WizardWarning", "heightOffset");
+    const auto &source = registry.ctx().get<DRAW::ModelManager>().models.at("PurpleSpellEffect");
+    auto transform = registry.get<DRAW::GPUInstance>(source.meshEntities.at(0)).transform;
+    // The authored XY ring has outer radius 1.25; its exported transform aligns it to XZ.
+    // Scale only the ring plane, preserving thickness and the existing floor clearance.
+    const float scale = attack.radius / 1.25f;
+    transform.row1.x *= scale;
+    transform.row1.y *= scale;
+    transform.row1.z *= scale;
+    transform.row2.x *= scale;
+    transform.row2.y *= scale;
+    transform.row2.z *= scale;
+    transform.row4 = {center.x, center.y + heightOffset, center.z, 1};
+    const auto area = CreateRenderable(registry, "PurpleSpellEffect", transform);
     try {
-        registry.emplace<DRAW::MeshCollection>(area);
+        // One model owns all its submeshes; synchronization preserves this single transform.
         registry.emplace<SpellArea>(area, SpellArea{center, attack.radius, attack.damage});
-        constexpr int markers = 24;
-        for (int i = 0; i < markers; ++i) {
-            const float angle = 6.283185307f * i / markers;
-            GW::MATH::GMATRIXF transform;
-            GW::MATH::GMatrix::IdentityF(transform);
-            transform.row1.x = transform.row3.z = 0.12f;
-            transform.row2.y = 0.04f;
-            transform.row4 = {center.x + std::cos(angle) * attack.radius,
-                              center.y - 0.35f,
-                              center.z + std::sin(angle) * attack.radius, 1};
-            const auto marker = CreateRenderable(registry,
-                registry.ctx().get<CharacterConfig>().model, transform);
-            // Transfer mesh ownership to the spell. No Transform on the spell:
-            // its individual marker transforms must keep their circle positions.
-            auto &meshes = registry.get<DRAW::MeshCollection>(marker).meshEntities;
-            try {
-                auto &owned = registry.get<DRAW::MeshCollection>(area).meshEntities;
-                owned.insert(owned.end(), meshes.begin(), meshes.end());
-            } catch (...) {
-                registry.destroy(marker);
-                throw;
-            }
-            for (auto mesh : meshes) {
-                auto &material = registry.get<DRAW::GPUInstance>(mesh).matData;
-                material.Kd = {0.65f, 0.1f, 1.0f};
-                material.Ke = {0.45f, 0.0f, 0.8f};
-            }
-            meshes.clear();
-            registry.destroy(marker);
-        }
     } catch (...) {
         registry.destroy(area);
         throw;
