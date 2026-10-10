@@ -168,6 +168,23 @@ void InitializeGameplay(entt::registry &registry)
     registry.emplace<WarriorAOE>(player);
     AttachCharacter(registry, player, playerConfig);
     CreateEnemy(registry, enemyConfig, enemyConfig.transform.matrix);
+    // Reuse the loaded enemy model; the orange tint identifies the ranged variant.
+    auto rangedPlacement = playerConfig.transform.matrix;
+    rangedPlacement.row4.x += 5.0f;
+    rangedPlacement.row4.z += 3.0f;
+    const auto rangedEnemy = CreateEnemy(registry, enemyConfig, rangedPlacement);
+    registry.emplace<RangedAttack>(rangedEnemy);
+    for (auto mesh : registry.get<DRAW::MeshCollection>(rangedEnemy).meshEntities) {
+        auto &material = registry.get<DRAW::GPUInstance>(mesh).matData;
+        material.Kd = {1.0f, 0.35f, 0.05f};
+    }
+    auto wizardPlacement = playerConfig.transform.matrix;
+    wizardPlacement.row4.x -= 5.0f;
+    wizardPlacement.row4.z += 3.0f;
+    const auto wizard = CreateEnemy(registry, enemyConfig, wizardPlacement);
+    registry.emplace<WizardAttack>(wizard);
+    for (auto mesh : registry.get<DRAW::MeshCollection>(wizard).meshEntities)
+        registry.get<DRAW::GPUInstance>(mesh).matData.Kd = {0.65f, 0.1f, 1.0f};
     const auto spawnerEntity = registry.create();
     registry.emplace<HordeSpawner>(spawnerEntity, spawner);
     registry.emplace<Transform>(spawnerEntity, enemyConfig.transform);
@@ -183,7 +200,10 @@ void UpdateGameSystems(entt::registry &registry)
     UpdateDamageFlash(registry, deltaTime);
     UpdateCombatTimers(registry, deltaTime);
     UpdatePlayer(registry, deltaTime);
+    // Age existing warnings before creating new ones so each gets its full delay.
+    UpdateSpellAreas(registry, deltaTime);
     UpdateEnemy(registry, deltaTime);
+    UpdateProjectiles(registry, deltaTime);
     // Combat deaths free population slots now; new enemies begin AI next frame.
     // Spawn before mesh synchronization so new instances render at their placement immediately.
     UpdateHordeSpawner(registry, deltaTime);

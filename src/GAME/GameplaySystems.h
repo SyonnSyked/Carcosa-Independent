@@ -7,6 +7,8 @@ void ActivateDamageFlash(entt::registry &registry, entt::entity entity);
 void UpdateDamageFlash(entt::registry &registry, float deltaTime);
 void UpdatePlayer(entt::registry &registry, float deltaTime);
 void UpdateEnemy(entt::registry &registry, float deltaTime);
+void UpdateProjectiles(entt::registry &registry, float deltaTime);
+void UpdateSpellAreas(entt::registry &registry, float deltaTime);
 void UpdateCamera(entt::registry &registry);
 void UpdateHordeSpawner(entt::registry &registry, float deltaTime);
 void TryWarriorAOE(entt::registry &registry, entt::entity player);
