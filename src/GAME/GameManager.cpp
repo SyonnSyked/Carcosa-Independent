@@ -94,6 +94,10 @@ void InitializeGameplaySettings(entt::registry &registry, const GameConfig &sett
 
     registry.ctx().emplace<GameplayCameraConfig>(cameraConfig);
     registry.ctx().emplace<PickupConfig>(pickupConfig);
+    CollisionConfig collision{settings.RequireFloat("Collision", "playerRadius")};
+    if (collision.playerRadius <= 0)
+        throw std::runtime_error("Invalid Collision.playerRadius: must be positive and finite");
+    registry.ctx().emplace<CollisionConfig>(collision);
 }
 
 void IntegrateVelocity(entt::registry &registry, float deltaTime)
@@ -168,6 +172,7 @@ void InitializeGameplay(entt::registry &registry)
     const auto enemyConfig = LoadCharacter(registry, "Enemy");
     const auto spawner = LoadHordeSpawner(settings);
     InitializeGameplaySettings(registry, settings);
+    InitializeDungeonKeys(registry);
 
     // The shared recipe is parsed once. Each actor still owns independent ECS state.
     InitializeDamageFeedback(registry);
@@ -201,6 +206,8 @@ void InitializeGameplay(entt::registry &registry)
 
 void UpdateGameSystems(entt::registry &registry)
 {
+    if (registry.ctx().get<DungeonState>().complete)
+        return;
     const float deltaTime = static_cast<float>(registry.ctx().get<UTIL::DeltaTime>().dtSec);
     // Age previous flashes first; hits this frame get their full configured duration.
     UpdateDamageFlash(registry, deltaTime);
@@ -214,6 +221,8 @@ void UpdateGameSystems(entt::registry &registry)
     UpdateCamera(registry);
 
     IntegrateVelocity(registry, deltaTime);
+    CollectDungeonKey(registry);
+    UseDungeonKey(registry);
     SynchronizeMeshTransforms(registry);
     DestroyPendingEntities(registry);
 }

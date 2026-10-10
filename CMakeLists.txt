@@ -15,6 +15,7 @@ set(PROJECT_SOURCES
     src/DRAW/VulkanBuffers.cpp
     src/DRAW/VulkanRenderer.cpp
     src/GAME/Player.cpp
+    src/GAME/Collision.cpp
     src/GAME/Enemy.cpp
     src/GAME/Boss.cpp
     src/GAME/Combat.cpp

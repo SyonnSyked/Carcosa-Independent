@@ -50,6 +50,9 @@ struct Class {
 
 struct Collidable {};
 struct Obstacle {};
+struct CollisionConfig {
+    float playerRadius; // World-space X/Z circle radius, independent of visual mesh bounds.
+};
 struct ToDestroy {};
 struct BonusStats {
     float BonusDamage = 0.0;
@@ -111,6 +114,18 @@ struct DungeonKey {
     int level;
 
     float distToUse;
+};
+
+struct DungeonKeyConfig {
+    std::string model;
+    DungeonKey key;
+    float pickupRadius;
+};
+
+// Shared completion state for the current dungeon; future menus can read this context.
+struct DungeonState {
+    int level;
+    bool complete = false;
 };
 
 struct PickUp {
