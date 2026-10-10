@@ -101,8 +101,14 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_CONFIGURATION_TYPES)
         message(FATAL_ERROR "Microsoft redistributable runtime DLLs were not found")
     endif()
     configure_file(scripts/package_game.cmake.in package_game.cmake @ONLY)
+    # The Release preset uses single-config Ninja. Always refresh runtime data/ZIP,
+    # while leaving Debug and multi-config default builds unchanged.
+    set(package_game_default)
+    if(CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT CMAKE_CONFIGURATION_TYPES)
+        set(package_game_default ALL)
+    endif()
     add_custom_target(
-        package_game
+        package_game ${package_game_default}
         COMMAND ${CMAKE_COMMAND} "-DGAME_EXECUTABLE=$<TARGET_FILE:${PROJECT_NAME}>"
                 "-DGAME_CONFIGURATION=$<CONFIG>" -P "${CMAKE_BINARY_DIR}/package_game.cmake"
         DEPENDS ${PROJECT_NAME}

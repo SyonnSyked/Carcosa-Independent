@@ -27,10 +27,10 @@ The run script launches `build/dev/Carcosa.exe`. Each build automatically copies
 
 ```powershell
 cmake --preset release
-cmake --build --preset release --target package_game
+cmake --build --preset release
 ```
 
-This builds Release, recreates `build/release/distribution`, and creates `build/release/Carcosa.zip`. The ZIP contains `bin/Carcosa.exe`, redistributable runtime DLLs, `assets/`, `config/`, compiled `shaders/*.spv`, and `ReadMe.txt`. No development or shader source is included. Extract the entire ZIP and launch `bin/Carcosa.exe`; resources resolve from its parent directory. Windows and a Vulkan-capable graphics driver are required; the Vulkan SDK is only needed to build/package. Development builds retain runtime HLSL compilation.
+This automatically builds Release, recreates `build/release/distribution`, and creates `build/release/Carcosa.zip` on every Release build, including after data-only edits. The ZIP contains `bin/Carcosa.exe`, redistributable runtime DLLs, `assets/`, `config/`, compiled `shaders/*.spv`, and `ReadMe.txt`. No development or shader source is included. Extract the entire ZIP and launch `bin/Carcosa.exe`; resources resolve from its parent directory. Windows and a Vulkan-capable graphics driver are required; the Vulkan SDK is only needed to build/package. Development builds retain runtime HLSL compilation.
 
 ## Layout
 
