@@ -2,11 +2,25 @@
 #include <Gateware.h>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace GAME {
+
+struct Transform {
+    GW::MATH::GMATRIXF matrix;
+};
+
+struct Inventory {
+    std::vector<entt::entity> items;
+};
+
 struct Player {
     bool attackHeld = false;
     bool abilityHeld = false;
+
+    Transform location;
+
+    Inventory inventory;
 };
 struct WarriorAOE {
     float damage = 35.0f;
@@ -14,7 +28,12 @@ struct WarriorAOE {
     float cooldown = 3.0f;
     float remaining = 0.0f;
 };
-struct Enemy {};
+struct Enemy {
+    bool isBoss;
+
+    int whichKeyToDrop;
+};
+
 struct WizardAttack {
     float damage = 15.0f;
     float range = 7.0f;
@@ -57,6 +76,9 @@ struct Class {
 
 struct Collidable {};
 struct Obstacle {};
+struct CollisionConfig {
+    float playerRadius; // World-space X/Z circle radius, independent of visual mesh bounds.
+};
 struct ToDestroy {};
 struct BonusStats {
     float BonusDamage = 0.0;
@@ -97,6 +119,14 @@ struct BonusStats {
     }
 };
 
+struct VampireQueen {};
+
+struct VampiricDrainAttack {
+    float damage, lifeSteal, range;
+    float cooldown;
+    float remaining = 0;
+};
+
 enum class BounsStatPickUpType {
     BonusDamage,
     BonusHealth,
@@ -104,6 +134,24 @@ enum class BounsStatPickUpType {
     CDR,
     CritChance,
     AttackSpeed,
+};
+
+struct DungeonKey {
+    int level;
+
+    float distToUse;
+};
+
+struct DungeonKeyConfig {
+    std::string model;
+    DungeonKey key;
+    float pickupRadius;
+};
+
+// Shared completion state for the current dungeon; future menus can read this context.
+struct DungeonState {
+    int level;
+    bool complete = false;
 };
 
 struct PickUp {
@@ -155,9 +203,6 @@ enum class Screens
 		bool Running = true;
 	};
 
-struct Transform {
-    GW::MATH::GMATRIXF matrix;
-};
 
 struct Velocity {
     GW::MATH::GVECTORF vector;
@@ -172,6 +217,10 @@ struct CharacterConfig {
 
     float health;
     float speed;
+};
+
+struct DungeonExit {
+    Transform location;
 };
 
 } // namespace GAME

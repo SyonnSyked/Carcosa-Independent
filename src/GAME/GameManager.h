@@ -29,6 +29,11 @@ void RenderScreens(entt::registry &registry);
 void DrawBlackWindow();
 void ButtonStyleSetup();
 
+struct CharacterConfig;
+struct VampiricDrainAttack;
+entt::entity CreateVampireQueen(entt::registry &registry, const CharacterConfig &config,
+                               const VampiricDrainAttack &drain,
+                               const GW::MATH::GMATRIXF &placement);
 void InitializeGameplay(entt::registry &registry);
 void RestartGame(entt::registry &registry);
 void UpdateGameSystems(entt::registry &registry);
@@ -38,4 +43,6 @@ entt::entity CreateRenderable(entt::registry &registry, const std::string &model
                               const GW::MATH::GMATRIXF &transform);
 entt::entity CreateEnemy(entt::registry &registry, const CharacterConfig &config,
                          const GW::MATH::GMATRIXF &placement);
+
+float GroundDistance(entt::registry &registry, entt::entity a, entt::entity b);
 } // namespace GAME

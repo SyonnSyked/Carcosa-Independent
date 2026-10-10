@@ -1,6 +1,7 @@
 #include "../DRAW/DrawComponents.h"
 #include "../UTIL/Utilities.h"
 #include "GameComponents.h"
+#include "GameManager.h"
 #include "GameplaySystems.h"
 
 namespace GAME {
@@ -162,9 +163,7 @@ void MovePlayer(entt::registry &registry, entt::entity player, GW::INPUT::GInput
     const float length = std::sqrt(x * x + z * z);
     if (length > 0) {
         const float step = registry.get<Movement>(player).speed * deltaTime / length;
-        auto &position = registry.get<Transform>(player).matrix.row4;
-        position.x += x * step;
-        position.z += z * step;
+        MovePlayerWithCollision(registry, player, x * step, z * step);
     }
 }
 } // namespace
@@ -209,4 +208,3 @@ void UpdateCamera(entt::registry &registry)
     }
 }
 } // namespace GAME
-
