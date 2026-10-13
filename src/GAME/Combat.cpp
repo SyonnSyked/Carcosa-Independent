@@ -1,17 +1,15 @@
 #include "GameComponents.h"
+#include "GameManager.h"
 #include "GameplaySystems.h"
 
 namespace GAME {
-float GroundDistance(entt::registry &registry, entt::entity a, entt::entity b)
-{
-    const auto &p = registry.get<Transform>(a).matrix.row4;
-    const auto &q = registry.get<Transform>(b).matrix.row4;
-    const float x = q.x - p.x, z = q.z - p.z;
-    return std::sqrt(x * x + z * z);
-}
 
 void UpdateCombatTimers(entt::registry &registry, float deltaTime)
 {
+    for (auto entity : registry.view<VampiricDrainAttack>()) {
+        auto &timer = registry.get<VampiricDrainAttack>(entity).remaining;
+        timer = (std::max)(0.0f, timer - deltaTime);
+    }
     for (auto entity : registry.view<WarriorAOE>()) {
         auto &timer = registry.get<WarriorAOE>(entity).remaining;
         timer = (std::max)(0.0f, timer - deltaTime);
@@ -21,7 +19,6 @@ void UpdateCombatTimers(entt::registry &registry, float deltaTime)
         timer = (std::max)(0.0f, timer - deltaTime);
     }
 }
-
 void TryMeleeAttack(entt::registry &registry, entt::entity attacker, entt::entity target)
 {
     auto &attack = registry.get<MeleeAttack>(attacker);
@@ -40,13 +37,9 @@ void TryMeleeAttack(entt::registry &registry, entt::entity attacker, entt::entit
     const char *victim = registry.all_of<Player>(target) ? "Player" : "Enemy";
     std::cout << source << " attacked " << victim << ": " << attack.damage << " damage\n"
               << victim << " health: " << health.current << " / " << health.maximum << std::endl;
-    if (health.current == 0) {
-        std::cout << victim << " died." << std::endl;
-        // Keep the dead player visible and the camera anchored; enemies own removable meshes.
-        if (registry.all_of<Enemy>(target))
-            registry.emplace<ToDestroy>(target);
-    }
+    HandleEntityDeath(registry);
 }
+
 void TryWarriorAOE(entt::registry &registry, entt::entity player)
 {
     if (!registry.valid(player) ||
@@ -66,11 +59,26 @@ void TryWarriorAOE(entt::registry &registry, entt::entity player)
         health.current = (std::max)(0.0f, health.current - ability.damage);
         ActivateDamageFlash(registry, enemy);
         ++hits;
-        if (health.current == 0)
-            registry.emplace<ToDestroy>(enemy);
+        HandleEntityDeath(registry);
     }
     std::cout << "Warrior AOE hit " << hits << " enemies for " << ability.damage
               << " damage each. Cooldown: " << ability.cooldown << " seconds.\n";
 }
-} // namespace GAME
 
+void HandleEntityDeath(entt::registry &registry)
+{
+    for (auto victim : registry.view<Transform, Health>(entt::exclude<ToDestroy>)) {
+        auto &health = registry.get<Health>(victim);
+        if (health.current <= 0) {
+            if (registry.all_of<Enemy>(victim)) {
+                if (registry.get<Enemy>(victim).isBoss == true) {
+                    DropDungeonKey(registry, registry.get<Transform>(victim));
+                }
+            }
+            if (registry.all_of<Player>(victim))
+                ChangeScreen(Screens::GameOverMenu);
+            registry.emplace<ToDestroy>(victim);
+        }
+    }
+}
+} // namespace GAME

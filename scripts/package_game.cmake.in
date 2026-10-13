@@ -25,7 +25,10 @@ file(GET_RUNTIME_DEPENDENCIES
     DIRECTORIES ${runtime_directories} "@VULKAN_LOADER_DIR@"
     RESOLVED_DEPENDENCIES_VAR resolved
     UNRESOLVED_DEPENDENCIES_VAR unresolved
+    # Optional Windows security delay-import of SHELL32.dll; exclude by name
+    # before resolution because it may be absent from the Windows installation.
     PRE_EXCLUDE_REGEXES "^[Aa][Pp][Ii]-" "^[Ee][Xx][Tt]-"
+        "^[Hh][Vv][Ss][Ii][Ff][Ii][Ll][Ee][Tt][Rr][Uu][Ss][Tt]\\.[Dd][Ll][Ll]$"
     POST_EXCLUDE_REGEXES "[Ww][Ii][Nn][Dd][Oo][Ww][Ss]/[Ss][Yy][Ss][Tt][Ee][Mm]32/.*")
 if(unresolved)
     message(FATAL_ERROR "Unresolved runtime dependencies: ${unresolved}")
