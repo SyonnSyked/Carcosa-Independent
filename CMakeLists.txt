@@ -15,14 +15,24 @@ set(PROJECT_SOURCES
     src/DRAW/VulkanBuffers.cpp
     src/DRAW/VulkanRenderer.cpp
     src/GAME/Player.cpp
+    src/GAME/Collision.cpp
     src/GAME/Enemy.cpp
+    src/GAME/Boss.cpp
     src/GAME/Combat.cpp
-    "src/GAME/PickUp&Apply.cpp"
+    src/GAME/PickUp&Apply.cpp
     src/GAME/DamageFeedback.cpp
     src/GAME/HordeSpawner.cpp
+    src/GAME/DungeonKeys.cpp
     src/GAME/GameManager.cpp
     src/UTIL/GameConfig.cpp
-    src/UTIL/Utilities.cpp)
+    src/UTIL/Utilities.cpp
+    include/imgui/imgui.cpp
+    include/imgui/imgui_draw.cpp
+    include/imgui/imgui_tables.cpp
+    include/imgui/imgui_widgets.cpp
+    include/imgui/backends/imgui_impl_vulkan.cpp
+    include/imgui/backends/imgui_impl_win32.cpp
+    )
 set(PROJECT_HEADERS
     precompiled.h
     src/APP/Window.hpp
@@ -35,7 +45,11 @@ set(PROJECT_HEADERS
     src/GAME/GameplaySystems.h
     src/GAME/GameManager.h
     src/UTIL/GameConfig.h
-    src/UTIL/Utilities.h)
+    src/UTIL/Utilities.h
+    include/imgui/imgui.h
+    include/imgui/backends/imgui_impl_vulkan.h
+    include/imgui/backends/imgui_impl_win32.h
+    )
 set(PROJECT_SHADERS shaders/LevelVertex.hlsl shaders/LevelPixel.hlsl)
 
 # Keep object filenames containing & out of the Windows linker shell command.
@@ -64,6 +78,8 @@ target_include_directories(
             "${CMAKE_CURRENT_SOURCE_DIR}/include/entt-3.13.1/single_include"
             "${CMAKE_CURRENT_SOURCE_DIR}/include/json-develop/single_include"
             "${CMAKE_CURRENT_SOURCE_DIR}/include/inifile-cpp-master/include"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include/imgui"
+            "${CMAKE_CURRENT_SOURCE_DIR}/include/imgui/backends"
             "$ENV{VULKAN_SDK}/Include")
 target_link_directories(${PROJECT_NAME} PRIVATE "$ENV{VULKAN_SDK}/Lib")
 target_precompile_headers(${PROJECT_NAME} PRIVATE precompiled.h)
@@ -85,7 +101,14 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_CONFIGURATION_TYPES)
         message(FATAL_ERROR "Microsoft redistributable runtime DLLs were not found")
     endif()
     configure_file(scripts/package_game.cmake.in package_game.cmake @ONLY)
-    add_custom_target(package_game
+    # The Release preset uses single-config Ninja. Always refresh runtime data/ZIP,
+    # while leaving Debug and multi-config default builds unchanged.
+    set(package_game_default)
+    if(CMAKE_BUILD_TYPE STREQUAL "Release" AND NOT CMAKE_CONFIGURATION_TYPES)
+        set(package_game_default ALL)
+    endif()
+    add_custom_target(
+        package_game ${package_game_default}
         COMMAND ${CMAKE_COMMAND} "-DGAME_EXECUTABLE=$<TARGET_FILE:${PROJECT_NAME}>"
                 "-DGAME_CONFIGURATION=$<CONFIG>" -P "${CMAKE_BINARY_DIR}/package_game.cmake"
         DEPENDS ${PROJECT_NAME}
@@ -93,7 +116,8 @@ if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_CONFIGURATION_TYPES)
         VERBATIM)
 else()
     # Packaging from a development build still uses the official Release preset.
-    add_custom_target(package_game
+    add_custom_target(
+        package_game
         COMMAND ${CMAKE_COMMAND} --preset release
         COMMAND ${CMAKE_COMMAND} --build --preset release --target package_game
         WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"

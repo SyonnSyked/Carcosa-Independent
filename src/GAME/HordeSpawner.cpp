@@ -4,10 +4,8 @@
 #include <numbers>
 #include <random>
 
-namespace GAME
-{
-namespace
-{
+namespace GAME {
+namespace {
 entt::entity FindLivingSpawnPlayer(entt::registry &registry)
 {
     for (auto entity : registry.view<Player, Transform, Health>(entt::exclude<ToDestroy>)) {
@@ -60,7 +58,10 @@ void UpdateHordeSpawner(entt::registry &registry, float deltaTime)
         auto placement = registry.get<Transform>(entity).matrix;
         placement.row4.x = center.x + std::cos(direction) * distance;
         placement.row4.z = center.z + std::sin(direction) * distance;
-        CreateEnemy(registry, config, placement);
+        std::discrete_distribution<int> variant{
+            spawner.meleeWeight, spawner.rangedWeight, spawner.wizardWeight};
+        CreateEnemyVariant(registry, config, placement,
+                           static_cast<EnemyVariant>(variant(*random)));
         ++alive;
         ++spawner.spawned;
         spawner.elapsed = 0; // At most one spawn per spawner/frame, including interval zero.

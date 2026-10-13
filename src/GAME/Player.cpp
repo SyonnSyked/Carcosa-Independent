@@ -1,6 +1,7 @@
 #include "../DRAW/DrawComponents.h"
 #include "../UTIL/Utilities.h"
 #include "GameComponents.h"
+#include "GameManager.h"
 #include "GameplaySystems.h"
 
 namespace GAME {
@@ -256,4 +257,3 @@ void UpdateCamera(entt::registry &registry)
     }
 }
 } // namespace GAME
-

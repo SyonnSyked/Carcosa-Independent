@@ -2,11 +2,25 @@
 #include <Gateware.h>
 #include <cstdint>
 #include <string>
+#include <vector>
 
 namespace GAME {
+
+struct Transform {
+    GW::MATH::GMATRIXF matrix;
+};
+
+struct Inventory {
+    std::vector<entt::entity> items;
+};
+
 struct Player {
     bool attackHeld = false;
     bool abilityHeld = false;
+
+    Transform location;
+
+    Inventory inventory;
 };
 struct WarriorAOE {
     float damage = 35.0f;
@@ -14,7 +28,40 @@ struct WarriorAOE {
     float cooldown = 3.0f;
     float remaining = 0.0f;
 };
-struct Enemy {};
+struct Enemy {
+    bool isBoss;
+
+    int whichKeyToDrop;
+};
+
+enum class EnemyVariant { Melee, Ranged, Wizard };
+
+struct WizardAttack {
+    float damage = 15.0f;
+    float range = 7.0f;
+    float radius = 2.0f;
+    float cooldown = 3.0f;
+    float remaining = 0.0f;
+};
+struct SpellArea {
+    GW::MATH::GVECTORF center;
+    float radius;
+    float damage;
+    float remaining = 1.0f;
+    bool detonated = false;
+};
+struct RangedAttack {
+    float damage = 10.0f;
+    float range = 6.0f;
+    float cooldown = 1.5f;
+    float remaining = 0.0f;
+};
+struct Projectile {
+    GW::MATH::GVECTORF velocity;
+    float damage;
+    float remaining = 2.0f;
+    float hitRadius = 0.65f;
+};
 struct Health {
     float current, maximum;
 };
@@ -37,6 +84,9 @@ struct Class {
 
 struct Collidable {};
 struct Obstacle {};
+struct CollisionConfig {
+    float playerRadius; // World-space X/Z circle radius, independent of visual mesh bounds.
+};
 struct ToDestroy {};
 struct BonusStats {
     float BonusDamage = 0.0;
@@ -77,6 +127,14 @@ struct BonusStats {
     }
 };
 
+struct VampireQueen {};
+
+struct VampiricDrainAttack {
+    float damage, lifeSteal, range;
+    float cooldown;
+    float remaining = 0;
+};
+
 enum class BounsStatPickUpType {
     BonusDamage,
     BonusHealth,
@@ -85,6 +143,24 @@ enum class BounsStatPickUpType {
     CritChance,
     AttackSpeed,
     HealthRestore
+};
+
+struct DungeonKey {
+    int level;
+
+    float distToUse;
+};
+
+struct DungeonKeyConfig {
+    std::string model;
+    DungeonKey key;
+    float pickupRadius;
+};
+
+// Shared completion state for the current dungeon; future menus can read this context.
+struct DungeonState {
+    int level;
+    bool complete = false;
 };
 
 struct PickUp {
@@ -118,11 +194,28 @@ struct HordeSpawner {
     int totalSpawnLimit; // Zero means unlimited; counts only this spawner's creations.
     float elapsed = 0;
     std::uint64_t spawned = 0;
+    float meleeWeight = 1;
+    float rangedWeight = 1;
+    float wizardWeight = 1;
 };
 
-struct Transform {
-    GW::MATH::GMATRIXF matrix;
-};
+enum class Screens 
+	{
+		MainMenu,
+		PauseMenu,
+		GameOverMenu,
+		Playing,
+		WinMenu
+	};
+
+	
+
+	struct ActiveScreen
+	{
+		Screens Active;
+		bool Running = true;
+	};
+
 
 struct Velocity {
     GW::MATH::GVECTORF vector;
@@ -137,6 +230,10 @@ struct CharacterConfig {
 
     float health;
     float speed;
+};
+
+struct DungeonExit {
+    Transform location;
 };
 
 } // namespace GAME
