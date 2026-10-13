@@ -161,7 +161,23 @@ bool IsInputDown(GW::INPUT::GInput &input, int key)
         const float z = float(IsInputDown(input, G_KEY_W)) - float(IsInputDown(input, G_KEY_S));
         const float length = std::sqrt(x * x + z * z);
         if (length > 0) {
-              const float step = registry.get<Movement>(player).speed * deltaTime / length;
+            // Get the player's normal movement speed.
+            float moveSpeed = registry.get<Movement>(player).speed;
+
+            // Check if the player currently has a speed boost.
+            if (registry.all_of<SpeedBoost>(player))
+            {
+                const auto& boost = registry.get<SpeedBoost>(player);
+
+                // Make the player move faster while the potion is active.
+                if (boost.remaining > 0.0f)
+                {
+                    moveSpeed *= boost.multiplier;
+                }
+            }
+
+            // Calculate movement using the boosted speed.
+            const float step = moveSpeed * deltaTime / length;
               auto &position = registry.get<Transform>(player).matrix.row4;
               position.x += x * step;
               position.z += z * step;
@@ -183,6 +199,24 @@ void UpdatePlayer(entt::registry &registry, float deltaTime)
         player.abilityHeld = abilityDown;
         if (registry.get<Health>(entity).current <= 0)
             continue;
+
+        // Update the speed potion timer.
+        if (registry.all_of<SpeedBoost>(entity))
+        {
+            auto& boost = registry.get<SpeedBoost>(entity);
+
+            // Count down using the time between frames.
+            boost.remaining -= deltaTime;
+
+            // Remove the boost when the timer runs out.
+            if (boost.remaining <= 0.0f)
+            {
+                registry.remove<SpeedBoost>(entity);
+
+                std::cout << "Speed Boost Expired!" << std::endl;
+            }
+        }
+
         // Pick against the camera and mesh transforms of the displayed frame, before movement.
         const auto target = pressed ? PickEnemy(registry) : entt::null;
         // Move the player using keyboard input.

@@ -230,6 +230,28 @@ void InitializeGameplay(entt::registry &registry)
         << playerHealth.current << "/"
         << playerHealth.maximum << std::endl;
 
+    // Testing the speed boost potion
+
+// Spawn another potion 7 units to the right of the player.
+// This keeps it separate from our health potion.
+    auto speedPotionTransform = playerConfig.transform;
+    speedPotionTransform.matrix.row4.x += 7.0f;
+
+    // Use the health potion model temporarily.
+    // I'll replace it with a blue potion later.
+    const auto speedPotion =
+        CreateRenderable(registry, "SpeedPotion", speedPotionTransform.matrix);
+
+    // Give this potion the temporary speed boost effect.
+    registry.emplace<PickUp>(
+        speedPotion,
+        PickUp{ BounsStatPickUpType::BonusSpeed, 0.5f }
+    );
+
+    // Print a message so I know the potion spawned.
+    std::cout << "TEST: Speed potion spawned 7 units to the right!"
+        << std::endl;
+
     CreateEnemy(registry, enemyConfig, enemyConfig.transform.matrix);
     CreateEnemy(registry, enemyConfig, enemyConfig.transform.matrix);
     // Reuse the loaded enemy model; the orange tint identifies the ranged variant.
@@ -545,35 +567,35 @@ ImU32 MenuColor(ImVec4 color, float alpha = 1.0f)
     return ImGui::ColorConvertFloat4ToU32(color);
 }
 
-void DrawMenuFrame(const MenuLayout &layout, bool mainMenu, bool gameOver)
+void DrawMenuFrame(const MenuLayout& layout, bool mainMenu, bool gameOver)
 {
-    const auto *viewport = ImGui::GetMainViewport();
+    const auto* viewport = ImGui::GetMainViewport();
     const auto size = viewport->Size;
-    auto *draw = ImGui::GetWindowDrawList();
+    auto* draw = ImGui::GetWindowDrawList();
     const float cx = layout.center, top = layout.top, s = layout.scale;
     const float halfWidth = menuSettings.panelWidth * 0.5f;
     const ImU32 edge = ImGui::ColorConvertFloat4ToU32(menuSettings.brass);
     const ImU32 accent = ImGui::ColorConvertFloat4ToU32(gameOver ? menuSettings.danger : menuSettings.gold);
     // Inset stage and manuscript borders; all decoration belongs to this one menu window.
     draw->AddRectFilled(viewport->Pos, ImVec2(viewport->Pos.x + size.x, viewport->Pos.y + size.y),
-                        MenuColor(menuSettings.background, mainMenu ? 1.0f : 235/255.0f));
-    draw->AddRectFilled(ImVec2(cx - halfWidth*s, top), ImVec2(cx + halfWidth*s, top + 610*s),
-                        ImGui::ColorConvertFloat4ToU32(menuSettings.parchment));
-    draw->AddRect(ImVec2(cx - (halfWidth - 10)*s, top + 10*s), ImVec2(cx + (halfWidth - 10)*s, top + 600*s), edge);
-    draw->AddRect(ImVec2(cx - (halfWidth - 18)*s, top + 18*s), ImVec2(cx + (halfWidth - 18)*s, top + 592*s),
-                  MenuColor(menuSettings.brass, 65/255.0f));
+        MenuColor(menuSettings.background, mainMenu ? 1.0f : 235 / 255.0f));
+    draw->AddRectFilled(ImVec2(cx - halfWidth * s, top), ImVec2(cx + halfWidth * s, top + 610 * s),
+        ImGui::ColorConvertFloat4ToU32(menuSettings.parchment));
+    draw->AddRect(ImVec2(cx - (halfWidth - 10) * s, top + 10 * s), ImVec2(cx + (halfWidth - 10) * s, top + 600 * s), edge);
+    draw->AddRect(ImVec2(cx - (halfWidth - 18) * s, top + 18 * s), ImVec2(cx + (halfWidth - 18) * s, top + 592 * s),
+        MenuColor(menuSettings.brass, 65 / 255.0f));
     for (int side : {-1, 1}) {
-        const float x = cx + side * (halfWidth - 31)*s;
-        for (float y : {top + 31*s, top + 579*s}) {
-            draw->AddLine(ImVec2(x - 9*s, y), ImVec2(x + 9*s, y), edge);
-            draw->AddLine(ImVec2(x, y - 9*s), ImVec2(x, y + 9*s), edge);
-            MenuDiamond(draw, ImVec2(x, y), 4*s, accent);
+        const float x = cx + side * (halfWidth - 31) * s;
+        for (float y : {top + 31 * s, top + 579 * s}) {
+            draw->AddLine(ImVec2(x - 9 * s, y), ImVec2(x + 9 * s, y), edge);
+            draw->AddLine(ImVec2(x, y - 9 * s), ImVec2(x, y + 9 * s), edge);
+            MenuDiamond(draw, ImVec2(x, y), 4 * s, accent);
         }
         // Sparse theater wings, behind the manuscript.
         for (int i = 0; i < 3; ++i) {
-            const float wing = cx + side * (halfWidth + 40 + 22*i)*s;
-            draw->AddLine(ImVec2(wing, top + (90 + 20*i)*s),
-                          ImVec2(wing, top + (520 - 20*i)*s), MenuColor(menuSettings.brass, 25/255.0f));
+            const float wing = cx + side * (halfWidth + 40 + 22 * i) * s;
+            draw->AddLine(ImVec2(wing, top + (90 + 20 * i) * s),
+                ImVec2(wing, top + (520 - 20 * i) * s), MenuColor(menuSettings.brass, 25 / 255.0f));
         }
     }
 }
