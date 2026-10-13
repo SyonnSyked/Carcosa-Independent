@@ -196,6 +196,28 @@ void InitializeGameplay(entt::registry &registry)
         << playerHealth.current << "/"
         << playerHealth.maximum << std::endl;
 
+    // Testing the speed boost potion
+
+// Spawn another potion 7 units to the right of the player.
+// This keeps it separate from our health potion.
+    auto speedPotionTransform = playerConfig.transform;
+    speedPotionTransform.matrix.row4.x += 7.0f;
+
+    // Use the health potion model temporarily.
+    // I'll replace it with a blue potion later.
+    const auto speedPotion =
+        CreateRenderable(registry, "HealthPotion", speedPotionTransform.matrix);
+
+    // Give this potion the temporary speed boost effect.
+    registry.emplace<PickUp>(
+        speedPotion,
+        PickUp{ BounsStatPickUpType::BonusSpeed, 0.5f }
+    );
+
+    // Print a message so I know the potion spawned.
+    std::cout << "TEST: Speed potion spawned 7 units to the right!"
+        << std::endl;
+
     CreateEnemy(registry, enemyConfig, enemyConfig.transform.matrix);
     CreateEnemy(registry, enemyConfig, enemyConfig.transform.matrix);
     const auto spawnerEntity = registry.create();

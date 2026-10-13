@@ -21,6 +21,12 @@ struct Health {
 struct Movement {
     float speed;
 };
+
+// Keeps track of a temporary speed boost.
+struct SpeedBoost {
+    float multiplier = 1.5f;  // Player moves 50% faster.
+    float remaining = 10.0f;  // Boost lasts for 10 seconds.
+};
 struct MeleeAttack {
     float damage, range, cooldown;
     float remaining = 0;
