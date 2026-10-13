@@ -169,14 +169,14 @@ void InitializeGameplay(entt::registry &registry)
     AttachCharacter(registry, player, playerConfig);
 
     // Testing the health pickup
-    const auto healthPotion = registry.create();
 
     // Spawn it a little to the right of the player
     auto potionTransform = playerConfig.transform;
     potionTransform.matrix.row4.x += 3.0f;
 
-    // Set the pickup position
-    registry.emplace<Transform>(healthPotion, potionTransform);
+    // Trying out the complete health potion model
+    const auto healthPotion =
+        CreateRenderable(registry, "HealthPotion", potionTransform.matrix);dd
 
     // Health pickup restores 25 HP
     registry.emplace<PickUp>(
