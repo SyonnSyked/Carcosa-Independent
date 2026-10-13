@@ -1,6 +1,7 @@
 #include "GameComponents.h"
 #include "GameplaySystems.h"
 #include <vector>
+#include <algorithm>
 
 namespace GAME
 {
@@ -26,6 +27,26 @@ void ApplyPickUp(entt::registry &registry, entt::entity player, const PickUp &pi
     case BounsStatPickUpType::AttackSpeed:
         bonusStats.increaseAttackSpeed(pickup.Amount);
         break;
+            case BounsStatPickUpType::HealthRestore:
+            {
+                // Make sure the player has a Health component.
+                if (registry.all_of<Health>(player))
+                {
+                    auto& health = registry.get<Health>(player);
+
+                    health.current = (std::min)(
+                        health.current + pickup.Amount,
+                        health.maximum
+                        );
+
+                    // Print a message so we know the potion worked.
+                    std::cout << "Health Potion Collected! Current HP: "
+                        << health.current << "/"
+                        << health.maximum << std::endl;
+                }
+
+                break;
+            }
     }
 }
 

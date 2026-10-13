@@ -283,10 +283,14 @@ def model_export():
             [exe_path], cwd=export_dir, stdout=subprocess.PIPE, stderr=subprocess.PIPE
         )
         output, errors = process.communicate()
-    for header in unique_names:
-        header_path = os.path.join(export_dir, f"{header}.h")
-        if os.path.isfile(header_path):
-            os.remove(header_path)
+    # delete any generated header files
+    # Clean up header files if they were created
+for header in unique_names:
+    header_path = os.path.join(export_dir, f"{header}.h")
+
+    if os.path.exists(header_path):
+        os.remove(header_path)
+
     print("----------End Model Conversion----------")
 
 
