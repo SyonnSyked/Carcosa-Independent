@@ -176,7 +176,7 @@ void InitializeGameplay(entt::registry &registry)
 
     // Trying out the complete health potion model
     const auto healthPotion =
-        CreateRenderable(registry, "HealthPotion", potionTransform.matrix);dd
+        CreateRenderable(registry, "HealthPotion", potionTransform.matrix);
 
     // Health pickup restores 25 HP
     registry.emplace<PickUp>(
