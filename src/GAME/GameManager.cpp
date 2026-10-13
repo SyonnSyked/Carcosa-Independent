@@ -240,7 +240,7 @@ void InitializeGameplay(entt::registry &registry)
     // Use the health potion model temporarily.
     // I'll replace it with a blue potion later.
     const auto speedPotion =
-        CreateRenderable(registry, "HealthPotion", speedPotionTransform.matrix);
+        CreateRenderable(registry, "SpeedPotion", speedPotionTransform.matrix);
 
     // Give this potion the temporary speed boost effect.
     registry.emplace<PickUp>(

@@ -1,10 +1,10 @@
-# Blender 5.1.2 MTL File: 'HealthPotion.blend'
+# Blender 5.1.2 MTL File: 'SpeedPotion.blend'
 # www.blender.org
 
 newmtl Material
 Ns 250.000000
 Ka 1.000000 1.000000 1.000000
-Kd 0.584079 0.009134 0.031896
+Kd 0.584078 0.009908 0.008502
 Ks 0.500000 0.500000 0.500000
 Ke 0.000000 0.000000 0.000000
 Ni 1.500000
