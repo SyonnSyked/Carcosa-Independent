@@ -1,5 +1,6 @@
 #include "../CCL.h"
 #include "DrawComponents.h"
+#include "VulkanTextures.h"
 #include "../GAME/GameComponents.h"
 
 namespace DRAW {
@@ -38,6 +39,7 @@ void Construct_GPULevel(entt::registry &registry, entt::entity entity)
     registry.patch<VulkanIndexBuffer>(entity);
 
     auto &models = modelManager.models;
+    auto &renderer = registry.get<VulkanRenderer>(entity);
 
     for (const auto &object : cpuLevel->lvlData.blenderObjects) {
         const auto &model = cpuLevel->lvlData.levelModels[object.modelIndex];
@@ -64,7 +66,7 @@ void Construct_GPULevel(entt::registry &registry, entt::entity entity)
                 meshEntity,
                 GeometryData{model.indexStart + mesh.drawInfo.indexOffset,
                              mesh.drawInfo.indexCount,
-                             model.vertexStart});
+                             model.vertexStart, LoadDiffuseTexture(renderer, material)});
             registry.emplace<GPUInstance>(meshEntity, GPUInstance{transform, material.attrib});
             if (model.isDynamic)
                 registry.emplace<DoNotRender>(meshEntity);

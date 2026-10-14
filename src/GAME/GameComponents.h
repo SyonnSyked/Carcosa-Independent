@@ -43,6 +43,7 @@ struct WizardAttack {
     float cooldown = 3.0f;
     float remaining = 0.0f;
 };
+
 struct SpellArea {
     GW::MATH::GVECTORF center;
     float radius;
@@ -72,8 +73,12 @@ struct MeleeAttack {
     float damage, range, cooldown;
     float remaining = 0;
 };
+
+enum class Abilities { AOESlam, ThrowAxe, JumpSlam, Berserk };
+
 struct Class {
     std::string Type;
+    std::vector<Abilities> classAbilities;
 };
 
 struct Collidable {};
@@ -192,23 +197,12 @@ struct HordeSpawner {
     float wizardWeight = 1;
 };
 
-enum class Screens 
-	{
-		MainMenu,
-		PauseMenu,
-		GameOverMenu,
-		Playing,
-		WinMenu
-	};
+enum class Screens { MainMenu, PauseMenu, GameOverMenu, Playing, WinMenu };
 
-	
-
-	struct ActiveScreen
-	{
-		Screens Active;
-		bool Running = true;
-	};
-
+struct ActiveScreen {
+    Screens Active;
+    bool Running = true;
+};
 
 struct Velocity {
     GW::MATH::GVECTORF vector;
@@ -216,6 +210,7 @@ struct Velocity {
 
 struct CharacterConfig {
     // Initialization recipe, not live ECS state. Transform preserves exported scale/orientation.
+    Class characterClass;
     MeleeAttack attackData;
     Transform transform;
 

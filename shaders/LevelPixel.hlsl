@@ -9,6 +9,8 @@ struct OBJ_ATTRIBUTES
 
 struct SHADER_MODEL_DATA { float4x4 worldMatrix; OBJ_ATTRIBUTES material; };
 StructuredBuffer<SHADER_MODEL_DATA> SceneData : register(b1);
+[[vk::binding(0, 1)]] Texture2D<float4> diffuseTexture;
+[[vk::binding(1, 1)]] SamplerState diffuseSampler;
 
 cbuffer SHADER_SCENE_DATA : register(b0)
 {
@@ -20,6 +22,8 @@ float4 main(float4 pos : SV_POSITION, float3 nrm : NORMAL,
             float3 posW : WORLD, float3 uvw : TEXCOORD, uint index : INDEX) : SV_TARGET
 {
     float4 diffuse = float4(SceneData[index].material.Kd, 1);
+    // Untextured draw groups bind opaque white, preserving the original Kd behavior.
+    diffuse.rgb *= diffuseTexture.Sample(diffuseSampler, uvw.xy).rgb;
     float4 specular = float4(SceneData[index].material.Ks, 1);
     float4 ambient = float4(SceneData[index].material.Ka, 1);
     float4 emissive = float4(SceneData[index].material.Ke, 1);
