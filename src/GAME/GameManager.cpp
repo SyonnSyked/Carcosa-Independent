@@ -202,6 +202,58 @@ void InitializeGameplay(entt::registry &registry)
     registry.emplace<Class>(player, Class{"Warrior"});
     registry.emplace<WarriorAOE>(player);
     AttachCharacter(registry, player, playerConfig);
+
+    // Testing the health pickup
+
+    // Spawn it a little to the right of the player
+    auto potionTransform = playerConfig.transform;
+    potionTransform.matrix.row4.x += 3.0f;
+
+    // Trying out the complete health potion model
+    const auto healthPotion =
+        CreateRenderable(registry, "HealthPotion", potionTransform.matrix);
+
+    // Health pickup restores 25 HP
+    registry.emplace<PickUp>(
+        healthPotion,
+        PickUp{ BounsStatPickUpType::HealthRestore, 25.0f }
+    );
+
+    // Lower player health for testing
+    auto& playerHealth = registry.get<Health>(player);
+    playerHealth.current = (std::max)(0.0f, playerHealth.maximum - 50.0f);
+
+    // Debug messages to check if everything works
+    std::cout << "TEST: Health potion spawned 3 units to the right!"
+        << std::endl;
+
+    std::cout << "TEST: Player HP is "
+        << playerHealth.current << "/"
+        << playerHealth.maximum << std::endl;
+
+    // Testing the speed boost potion
+
+// Spawn another potion 7 units to the right of the player.
+// This keeps it separate from our health potion.
+    auto speedPotionTransform = playerConfig.transform;
+    speedPotionTransform.matrix.row4.x += 7.0f;
+
+    // Use the health potion model temporarily.
+    // I'll replace it with a blue potion later.
+    const auto speedPotion =
+        CreateRenderable(registry, "SpeedPotion", speedPotionTransform.matrix);
+
+    // Give this potion the temporary speed boost effect.
+    registry.emplace<PickUp>(
+        speedPotion,
+        PickUp{ BounsStatPickUpType::BonusSpeed, 0.5f }
+    );
+
+    // Print a message so I know the potion spawned.
+    std::cout << "TEST: Speed potion spawned 7 units to the right!"
+        << std::endl;
+
+    CreateEnemy(registry, enemyConfig, enemyConfig.transform.matrix);
     CreateEnemy(registry, enemyConfig, enemyConfig.transform.matrix);
     // Reuse the loaded enemy model; the orange tint identifies the ranged variant.
     auto rangedPlacement = playerConfig.transform.matrix;
@@ -533,11 +585,11 @@ ImU32 MenuColor(ImVec4 color, float alpha = 1.0f)
     return ImGui::ColorConvertFloat4ToU32(color);
 }
 
-void DrawMenuFrame(const MenuLayout &layout, bool mainMenu, bool gameOver)
+void DrawMenuFrame(const MenuLayout& layout, bool mainMenu, bool gameOver)
 {
-    const auto *viewport = ImGui::GetMainViewport();
+    const auto* viewport = ImGui::GetMainViewport();
     const auto size = viewport->Size;
-    auto *draw = ImGui::GetWindowDrawList();
+    auto* draw = ImGui::GetWindowDrawList();
     const float cx = layout.center, top = layout.top, s = layout.scale;
     const float halfWidth = menuSettings.panelWidth * 0.5f;
     const ImU32 edge = ImGui::ColorConvertFloat4ToU32(menuSettings.brass);

@@ -155,17 +155,35 @@ bool IsInputDown(GW::INPUT::GInput &input, int key)
     return value > 0;
 }
 
-void MovePlayer(entt::registry &registry, entt::entity player, GW::INPUT::GInput &input,
-                float deltaTime)
-{
-    const float x = float(IsInputDown(input, G_KEY_D)) - float(IsInputDown(input, G_KEY_A));
-    const float z = float(IsInputDown(input, G_KEY_W)) - float(IsInputDown(input, G_KEY_S));
-    const float length = std::sqrt(x * x + z * z);
-    if (length > 0) {
-        const float step = registry.get<Movement>(player).speed * deltaTime / length;
-        MovePlayerWithCollision(registry, player, x * step, z * step);
+    void MovePlayer(entt::registry &registry, entt::entity player, GW::INPUT::GInput &input, float deltaTime)
+    {
+        const float x = float(IsInputDown(input, G_KEY_D)) - float(IsInputDown(input, G_KEY_A));
+        const float z = float(IsInputDown(input, G_KEY_W)) - float(IsInputDown(input, G_KEY_S));
+        const float length = std::sqrt(x * x + z * z);
+        if (length > 0) {
+            // Get the player's normal movement speed.
+            float moveSpeed = registry.get<Movement>(player).speed;
+
+            // Check if the player currently has a speed boost.
+            if (registry.all_of<SpeedBoost>(player))
+            {
+                const auto& boost = registry.get<SpeedBoost>(player);
+
+                // Make the player move faster while the potion is active.
+                if (boost.remaining > 0.0f)
+                {
+                    moveSpeed *= boost.multiplier;
+                }
+            }
+
+            // Calculate movement using the boosted speed.
+            const float step = moveSpeed * deltaTime / length;
+              auto &position = registry.get<Transform>(player).matrix.row4;
+              position.x += x * step;
+              position.z += z * step;
+        }
     }
-}
+
 } // namespace
 
 void UpdatePlayer(entt::registry &registry, float deltaTime)
@@ -181,9 +199,40 @@ void UpdatePlayer(entt::registry &registry, float deltaTime)
         player.abilityHeld = abilityDown;
         if (registry.get<Health>(entity).current <= 0)
             continue;
+
+        // Update the speed potion timer.
+        if (registry.all_of<SpeedBoost>(entity))
+        {
+            auto& boost = registry.get<SpeedBoost>(entity);
+
+            // Count down using the time between frames.
+            boost.remaining -= deltaTime;
+
+            // Remove the boost when the timer runs out.
+            if (boost.remaining <= 0.0f)
+            {
+                registry.remove<SpeedBoost>(entity);
+
+                std::cout << "Speed Boost Expired!" << std::endl;
+            }
+        }
+
         // Pick against the camera and mesh transforms of the displayed frame, before movement.
         const auto target = pressed ? PickEnemy(registry) : entt::null;
+        // Move the player using keyboard input.
         MovePlayer(registry, entity, input, deltaTime);
+
+        // Get the player's current position.
+        const auto& playerPosition =
+            registry.get<Transform>(entity).matrix.row4;
+
+        // Set the player's pickup collection radius.
+        const float playerRadius = 1.0f;
+
+        // Check for nearby pickups and collect them.
+        PickUpObject(registry, entity, playerPosition, playerRadius);
+
+        // Activate the Warrior's special ability.
         if (abilityPressed)
             TryWarriorAOE(registry, entity);
         if (target != entt::null && registry.all_of<MeleeAttack>(entity) &&

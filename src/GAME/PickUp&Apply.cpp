@@ -1,6 +1,7 @@
 #include "GameComponents.h"
 #include "GameplaySystems.h"
 #include <vector>
+#include <algorithm>
 
 namespace GAME
 {
@@ -15,8 +16,21 @@ void ApplyPickUp(entt::registry &registry, entt::entity player, const PickUp &pi
         bonusStats.increaseHealth(pickup.Amount);
         break;
     case BounsStatPickUpType::BonusSpeed:
-        bonusStats.increaseSpeed(pickup.Amount);
+    {
+        // Give the player a temporary speed boost.
+        auto& boost = registry.get_or_emplace<SpeedBoost>(player);
+
+        // Make the player 50% faster for 10 seconds.
+        boost.multiplier = 1.5f;
+        boost.remaining = 10.0f;
+
+        // Picking up another potion refreshes the timer.
+        std::cout << "Speed Potion Collected! 10 Second Boost Activated!"
+            << std::endl;
+
         break;
+    }
+    
     case BounsStatPickUpType::CDR:
         bonusStats.increaseCRD(pickup.Amount);
         break;
@@ -26,6 +40,26 @@ void ApplyPickUp(entt::registry &registry, entt::entity player, const PickUp &pi
     case BounsStatPickUpType::AttackSpeed:
         bonusStats.increaseAttackSpeed(pickup.Amount);
         break;
+            case BounsStatPickUpType::HealthRestore:
+            {
+                // Make sure the player has a Health component.
+                if (registry.all_of<Health>(player))
+                {
+                    auto& health = registry.get<Health>(player);
+
+                    health.current = (std::min)(
+                        health.current + pickup.Amount,
+                        health.maximum
+                        );
+
+                    // Print a message so we know the potion worked.
+                    std::cout << "Health Potion Collected! Current HP: "
+                        << health.current << "/"
+                        << health.maximum << std::endl;
+                }
+
+                break;
+            }
     }
 }
 
