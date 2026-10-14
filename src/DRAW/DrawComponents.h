@@ -9,6 +9,15 @@ namespace DRAW
 
 	struct DoNotRender {};
 
+	struct DiffuseTexture
+	{
+		VkImage image = VK_NULL_HANDLE;
+		VkDeviceMemory memory = VK_NULL_HANDLE;
+		VkImageView view = VK_NULL_HANDLE;
+		VkDescriptorPool pool = VK_NULL_HANDLE;
+		VkDescriptorSet descriptor = VK_NULL_HANDLE;
+	};
+
 
 	struct VulkanRendererInitialization
 	{
@@ -36,6 +45,11 @@ namespace DRAW
 		VkDescriptorSetLayout descriptorLayout = nullptr;
 		VkDescriptorPool descriptorPool = nullptr;
 		std::vector<VkDescriptorSet> descriptorSets;
+		// Renderer owns these shared resources until shutdown; index 0 is opaque white.
+		VkDescriptorSetLayout textureLayout = VK_NULL_HANDLE;
+		VkSampler textureSampler = VK_NULL_HANDLE;
+		std::vector<DiffuseTexture> diffuseTextures;
+		std::unordered_map<std::string, unsigned int> diffuseTextureCache;
 		VkClearValue clrAndDepth[2];
 		bool resourcesReleased = false;
 	};
@@ -55,8 +69,12 @@ namespace DRAW
 	struct GeometryData
 	{
 		unsigned int indexStart, indexCount, vertexStart;
+		unsigned int diffuseTexture = 0;
 		inline bool operator < (const GeometryData a) const {
-			return indexStart < a.indexStart;
+			if (indexStart != a.indexStart) return indexStart < a.indexStart;
+			if (indexCount != a.indexCount) return indexCount < a.indexCount;
+			if (vertexStart != a.vertexStart) return vertexStart < a.vertexStart;
+			return diffuseTexture < a.diffuseTexture;
 		}
 	};
 	

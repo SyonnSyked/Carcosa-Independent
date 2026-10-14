@@ -1,4 +1,5 @@
 #include "DrawComponents.h"
+#include "VulkanTextures.h"
 #include "../CCL.h"
 #include <map>
 #include "imgui.h"
@@ -265,11 +266,13 @@ namespace DRAW
 		dynamic_create_info.pDynamicStates = dynamic_states;
 
 		InitializeDescriptors(registry, entity);
+		InitializeDiffuseTextures(vulkanRenderer);
 
 		VkPipelineLayoutCreateInfo pipeline_layout_create_info = {};
 		pipeline_layout_create_info.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-		pipeline_layout_create_info.setLayoutCount = 1;
-		pipeline_layout_create_info.pSetLayouts = &vulkanRenderer.descriptorLayout;
+		VkDescriptorSetLayout layouts[] = {vulkanRenderer.descriptorLayout, vulkanRenderer.textureLayout};
+		pipeline_layout_create_info.setLayoutCount = 2;
+		pipeline_layout_create_info.pSetLayouts = layouts;
 		pipeline_layout_create_info.pushConstantRangeCount = 0;
 		pipeline_layout_create_info.pPushConstantRanges = nullptr;
 
@@ -506,6 +509,9 @@ namespace DRAW
 				unsigned int firstInstance = 0;
 				for (const auto& [geometry, instanceCount] : drawInstructions)
 				{
+					const auto textureSet = vulkanRenderer.diffuseTextures.at(geometry.diffuseTexture).descriptor;
+					vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+						vulkanRenderer.pipelineLayout, 1, 1, &textureSet, 0, nullptr);
 					vkCmdDrawIndexed(commandBuffer, geometry.indexCount, instanceCount,
 						geometry.indexStart, static_cast<int32_t>(geometry.vertexStart),
 						firstInstance);
@@ -542,6 +548,7 @@ namespace DRAW
 
 		vkDestroyPipeline(vulkanRenderer.device, vulkanRenderer.pipeline, nullptr);
 		vkDestroyPipelineLayout(vulkanRenderer.device, vulkanRenderer.pipelineLayout, nullptr);
+		DestroyDiffuseTextures(vulkanRenderer);
 		vkDestroyDescriptorPool(vulkanRenderer.device, vulkanRenderer.descriptorPool, nullptr);
 		vkDestroyDescriptorSetLayout(vulkanRenderer.device, vulkanRenderer.descriptorLayout, nullptr);
 		vkDestroyShaderModule(vulkanRenderer.device, vulkanRenderer.vertexShader, nullptr);

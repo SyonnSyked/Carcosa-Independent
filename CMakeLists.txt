@@ -14,6 +14,7 @@ set(PROJECT_SOURCES
     src/DRAW/Level.cpp
     src/DRAW/VulkanBuffers.cpp
     src/DRAW/VulkanRenderer.cpp
+    src/DRAW/VulkanTextures.cpp
     src/GAME/Player.cpp
     src/GAME/Collision.cpp
     src/GAME/Enemy.cpp
@@ -38,6 +39,7 @@ set(PROJECT_HEADERS
     src/APP/Window.hpp
     src/CCL.h
     src/DRAW/DrawComponents.h
+    src/DRAW/VulkanTextures.h
     src/DRAW/Utility/FileIntoString.h
     src/DRAW/Utility/h2bParser.h
     src/DRAW/Utility/load_data_oriented.h
@@ -89,6 +91,21 @@ set_source_files_properties(${PROJECT_SHADERS} PROPERTIES HEADER_FILE_ONLY TRUE 
 source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${PROJECT_SOURCES} ${PROJECT_HEADERS}
                                                       ${PROJECT_SHADERS})
 set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
+
+option(CARCOSA_TEXTURE_TESTS "Build PNG material regression checks" OFF)
+if(CARCOSA_TEXTURE_TESTS)
+    enable_testing()
+    add_executable(TextureTests tests/TextureTests.cpp src/DRAW/VulkanTextures.cpp)
+    target_compile_features(TextureTests PRIVATE cxx_std_20)
+    target_compile_options(TextureTests PRIVATE /MD)
+    target_compile_definitions(TextureTests PRIVATE UNICODE _UNICODE)
+    get_target_property(texture_test_includes ${PROJECT_NAME} INCLUDE_DIRECTORIES)
+    target_include_directories(TextureTests PRIVATE ${texture_test_includes})
+    target_link_directories(TextureTests PRIVATE "$ENV{VULKAN_SDK}/Lib")
+    target_precompile_headers(TextureTests PRIVATE precompiled.h)
+    add_test(NAME TextureMaterials COMMAND TextureTests)
+    set_tests_properties(TextureMaterials PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+endif()
 
 # Release Distribution
 if(CMAKE_BUILD_TYPE STREQUAL "Release" OR CMAKE_CONFIGURATION_TYPES)
