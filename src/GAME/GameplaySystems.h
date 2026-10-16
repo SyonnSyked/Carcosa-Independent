@@ -14,6 +14,9 @@ void UpdateVampireQueen(entt::registry &registry, float deltaTime);
 void UpdateCamera(entt::registry &registry);
 void UpdateHordeSpawner(entt::registry &registry, float deltaTime);
 void TryWarriorAOE(entt::registry &registry, entt::entity player);
+void TryThrowAxe(entt::registry &registry, entt::entity player,
+                 const GW::MATH::GVECTORF &target);
+void UpdateThrownAxes(entt::registry &registry, float deltaTime);
 void UpdateCombatTimers(entt::registry &registry, float deltaTime);
 void TryMeleeAttack(entt::registry &registry, entt::entity attacker, entt::entity target);
 void HandleEntityDeath(entt::registry &registry);

@@ -201,6 +201,7 @@ void InitializeGameplay(entt::registry &registry)
     registry.emplace<Player>(player);
     registry.emplace<Class>(player, Class{"Warrior"});
     registry.emplace<WarriorAOE>(player);
+    registry.emplace<AxeThrow>(player);
     AttachCharacter(registry, player, playerConfig);
 
     // Testing the health pickup
@@ -269,7 +270,8 @@ void InitializeGameplay(entt::registry &registry)
     registry.emplace<HordeSpawner>(spawnerEntity, spawner);
     registry.emplace<Transform>(spawnerEntity, enemyConfig.transform);
     UpdateCamera(registry);
-    std::cout << "Gameplay ready: WASD moves, left-click an enemy in melee range to attack."
+    std::cout << "Gameplay ready: WASD moves, left-click an enemy for melee, hold right-click "
+                 "to throw axes toward the cursor, 1 uses Warrior AOE."
               << std::endl;
 }
 
@@ -284,6 +286,7 @@ void RestartGame(entt::registry &registry)
     collect(registry.view<Player>());
     collect(registry.view<Enemy>());
     collect(registry.view<Projectile>());
+    collect(registry.view<ThrownAxe>());
     collect(registry.view<SpellArea>());
     collect(registry.view<HordeSpawner>());
     collect(registry.view<DungeonKey>());
@@ -337,6 +340,7 @@ void UpdateGameSystems(entt::registry &registry)
         DestroyPendingEntities(registry);
         return;
     }
+    UpdateThrownAxes(registry, deltaTime);
     UpdateVampireQueen(registry, deltaTime);
     if (CurrentState.ActiveScreen != Screens::Playing) {
         DestroyPendingEntities(registry);

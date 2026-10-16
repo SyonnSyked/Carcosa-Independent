@@ -111,6 +111,12 @@ World shader sources remain in `shaders/LevelVertex.hlsl` and `shaders/LevelPixe
 
 ## Gameplay reference
 
+Hold right-click to throw a spinning axe toward the ground under the cursor. Throws repeat every 0.35 seconds, deal 60% of the current melee damage (15 versus the default 25), and travel up to 8 world units at 12 units/second. An axe damages the first living enemy on its path once, then disappears; misses expire. Like existing enemy projectiles, axes currently do not collide with scenery. Melee and key-1 AOE keep their own cooldowns. Restart removes airborne axes and their meshes.
+
+`AxeThrow` in `src/GAME/GameComponents.h` holds tuning; `TryThrowAxe` and `UpdateThrownAxes` in `src/GAME/Combat.cpp` handle creation, movement, spin, and damage. `ThrowingAxe.h2b` is the supplied Quaternius axe, using its original wood, metal, and red material colors, registered as a hidden dynamic template in `assets/levels/Level1.json`. Include that template in any other playable level that supports this attack. The original OBJ, MTL, and CC0 license are preserved in `assets/source/throwing-axe`. The converter centers the model, rotates it onto the X/Z plane, and scales its length to 1.2 game units. To regenerate the model, run `python scripts/generate_throwing_axe.py`; Python is not required to build or play.
+
+Run the axe gameplay checks from a Developer PowerShell: `cmake --preset dev -DCARCOSA_AXE_TESTS=ON`, `cmake --build --preset dev`, then `ctest --test-dir build/dev -R WarriorAxeThrow --output-on-failure`. These use real gameplay code and model data without opening a GPU window.
+
 W/S move along +Z/-Z; A/D move along -X/+X. Movement uses elapsed frame time (delta time), keeps diagonal movement at the same speed, and preserves the exported Y height. Left-click a visible enemy within melee range to attack; holding the button does not repeat. Mouse targeting checks the rendered meshes, so scenery or another actor can block a target. Clicking empty space or an out-of-range enemy does not start the player's cooldown.
 
 Enemies chase and attack automatically. The default horde settings add one enemy every two seconds, 4-7 world units from the player, up to five living enemies at once. Spawning continues as enemies die. Characters briefly flash white when hit, and the console reports hits, health, and deaths. With the default stats, four player hits kill an enemy and ten enemy hits kill the player. Restart the application to reset.
