@@ -4,6 +4,7 @@
 #include "GameComponents.h"
 #include "GameplaySystems.h"
 #include "imgui.h"
+#include <cstdio>
 #include <sstream>
 
 namespace GAME {
@@ -201,6 +202,7 @@ void InitializeGameplay(entt::registry &registry)
     registry.emplace<Player>(player);
     registry.emplace<Class>(player, Class{"Warrior"});
     registry.emplace<WarriorAOE>(player);
+    registry.emplace<AxeThrow>(player);
     AttachCharacter(registry, player, playerConfig);
 
     // Testing the health pickup
@@ -269,7 +271,8 @@ void InitializeGameplay(entt::registry &registry)
     registry.emplace<HordeSpawner>(spawnerEntity, spawner);
     registry.emplace<Transform>(spawnerEntity, enemyConfig.transform);
     UpdateCamera(registry);
-    std::cout << "Gameplay ready: WASD moves, left-click an enemy in melee range to attack."
+    std::cout << "Gameplay ready: WASD moves, left-click an enemy for melee, hold right-click "
+                 "to throw axes toward the cursor, 1 uses Warrior AOE."
               << std::endl;
 }
 
@@ -284,6 +287,7 @@ void RestartGame(entt::registry &registry)
     collect(registry.view<Player>());
     collect(registry.view<Enemy>());
     collect(registry.view<Projectile>());
+    collect(registry.view<ThrownAxe>());
     collect(registry.view<SpellArea>());
     collect(registry.view<HordeSpawner>());
     collect(registry.view<DungeonKey>());
@@ -337,6 +341,7 @@ void UpdateGameSystems(entt::registry &registry)
         DestroyPendingEntities(registry);
         return;
     }
+    UpdateThrownAxes(registry, deltaTime);
     UpdateVampireQueen(registry, deltaTime);
     if (CurrentState.ActiveScreen != Screens::Playing) {
         DestroyPendingEntities(registry);
@@ -394,12 +399,91 @@ void ChangeScreen(Screens s)
     CurrentState.ActiveScreen = s;
 }
 
+namespace {
+void DrawPlayerHUD(entt::registry &registry)
+{
+    const auto players = registry.view<Player, Health>(entt::exclude<ToDestroy>);
+    if (players.begin() == players.end())
+        return;
+    const auto player = players.front();
+    const auto &health = registry.get<Health>(player);
+    const auto *viewport = ImGui::GetMainViewport();
+    if (viewport->Size.x <= 0 || viewport->Size.y <= 0)
+        return;
+    const float scale = (std::min)(1.5f, (std::min)(viewport->Size.x / 1280.0f,
+                                                   viewport->Size.y / 720.0f));
+    const float left = viewport->Pos.x + (viewport->Size.x - 452 * scale) * 0.5f;
+    const float top = viewport->Pos.y + viewport->Size.y - 160 * scale;
+    // Draw-list primitives create no widgets/windows that could capture combat input.
+    auto *draw = ImGui::GetBackgroundDrawList();
+    const ImU32 panel = IM_COL32(16, 18, 17, 235);
+    const ImU32 border = IM_COL32(139, 121, 79, 255);
+    const ImU32 gold = IM_COL32(222, 195, 129, 255);
+    const ImU32 text = IM_COL32(235, 229, 211, 255);
+    const ImU32 muted = IM_COL32(157, 157, 146, 255);
+    auto point = [&](float x, float y) { return ImVec2(left + x * scale, top + y * scale); };
+    auto label = [&](float x, float y, float size, ImU32 color, const char *value) {
+        draw->AddText(ImGui::GetFont(), size * scale, point(x, y), color, value);
+    };
+    auto centered = [&](float x, float y, float width, float size, ImU32 color, const char *value) {
+        const float textWidth = ImGui::GetFont()->CalcTextSizeA(size * scale, FLT_MAX, 0, value).x;
+        draw->AddText(ImGui::GetFont(), size * scale,
+                      ImVec2(left + (x + width * 0.5f) * scale - textWidth * 0.5f,
+                             top + y * scale), color, value);
+    };
+
+    draw->AddRectFilled(point(0, 0), point(452, 142), panel, 6 * scale);
+    draw->AddRect(point(0, 0), point(452, 142), border, 6 * scale);
+    label(14, 10, 14, gold, "WARRIOR");
+    const float maximum = std::isfinite(health.maximum) ? (std::max)(0.0f, health.maximum) : 0;
+    const float current = std::isfinite(health.current) ? (std::clamp)(health.current, 0.0f, maximum) : 0;
+    char hp[64];
+    std::snprintf(hp, sizeof(hp), "HP  %.0f / %.0f", current, maximum);
+    label(270, 10, 14, text, hp);
+    draw->AddRectFilled(point(14, 31), point(438, 47), IM_COL32(45, 27, 27, 255), 3 * scale);
+    const float fraction = maximum > 0 ? current / maximum : 0;
+    if (fraction > 0)
+        draw->AddRectFilled(point(14, 31), point(14 + 424 * fraction, 47),
+                            fraction <= 0.25f ? IM_COL32(225, 63, 53, 255) : IM_COL32(171, 49, 48, 255),
+                            3 * scale);
+
+    auto slot = [&](int index, const char *key, const char *name, bool available,
+                    float remaining, float cooldown) {
+        const float x = 14.0f + index * 144.0f;
+        const float time = std::isfinite(remaining) ? (std::max)(0.0f, remaining) : 0;
+        const bool ready = available && current > 0 && time <= 0;
+        draw->AddRectFilled(point(x, 58), point(x + 136, 129), IM_COL32(29, 31, 28, 255), 3 * scale);
+        draw->AddRect(point(x, 58), point(x + 136, 129), ready ? border : IM_COL32(65, 66, 59, 255), 3 * scale);
+        label(x + 8, 64, 12, gold, key);
+        centered(x, 82, 136, 17, available ? text : muted, name);
+        char status[24];
+        if (!available || current <= 0)
+            std::snprintf(status, sizeof(status), "Unavailable");
+        else if (ready)
+            std::snprintf(status, sizeof(status), "Ready");
+        else
+            std::snprintf(status, sizeof(status), "%.1fs", std::ceil(time * 10) / 10);
+        centered(x, 104, 136, 12, ready ? gold : muted, status);
+        const float progress = !available || current <= 0 ? 0 : ready ? 1 :
+            cooldown > 0 ? (std::clamp)(1 - time / cooldown, 0.0f, 1.0f) : 0;
+        draw->AddRectFilled(point(x + 6, 122), point(x + 130, 125), IM_COL32(47, 48, 42, 255));
+        if (progress > 0)
+            draw->AddRectFilled(point(x + 6, 122), point(x + 6 + 124 * progress, 125), ready ? gold : border);
+    };
+    const auto *melee = registry.try_get<MeleeAttack>(player);
+    const auto *axe = registry.try_get<AxeThrow>(player);
+    const auto *aoe = registry.try_get<WarriorAOE>(player);
+    slot(0, "LEFT CLICK", "Melee", melee != nullptr, melee ? melee->remaining : 0, melee ? melee->cooldown : 0);
+    slot(1, "RIGHT CLICK", "Axe throw", axe != nullptr, axe ? axe->remaining : 0, axe ? axe->cooldown : 0);
+    slot(2, "1", "AOE slam", aoe != nullptr, aoe ? aoe->remaining : 0, aoe ? aoe->cooldown : 0);
+}
+} // namespace
+
 void RenderScreens(entt::registry &registry)
 {
     switch (CurrentState.ActiveScreen) {
-        case Screens::Playing: // need my man to put the regular rendering stuff in here
-                               // for if we want a hud and what not
-
+        case Screens::Playing:
+            DrawPlayerHUD(registry);
             break;
         case Screens::MainMenu:
             DrawBlackWindow();
