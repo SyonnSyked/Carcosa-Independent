@@ -29,6 +29,7 @@ CharacterConfig LoadCharacter(entt::registry &registry, const char *role)
     const auto &settings = *registry.ctx().get<UTIL::Config>().gameConfig;
     const auto &tuning = settings.at(role);
     CharacterConfig config;
+    config.characterClass.Type = role;
     config.model = tuning.at("model").as<std::string>();
     config.health = settings.RequireFloat(role, "health");
     config.speed = settings.RequireFloat(role, "speed");
