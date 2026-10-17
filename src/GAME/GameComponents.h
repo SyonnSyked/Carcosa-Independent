@@ -28,6 +28,20 @@ struct WarriorAOE {
     float cooldown = 3.0f;
     float remaining = 0.0f;
 };
+struct AxeThrow {
+    float damageMultiplier = 0.6f;
+    float cooldown = 0.35f;
+    float remaining = 0.0f;
+    float speed = 12.0f;
+    float range = 8.0f;
+};
+struct ThrownAxe {
+    GW::MATH::GVECTORF velocity;
+    float damage;
+    float remaining;
+    float angle = 0.0f;
+    float hitRadius = 0.65f;
+};
 struct Enemy {
     bool isBoss;
 
