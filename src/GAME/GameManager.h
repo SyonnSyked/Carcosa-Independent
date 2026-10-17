@@ -10,6 +10,7 @@ namespace GAME {
 struct GameState {
     Screens ActiveScreen = Screens::MainMenu;
     bool Running = true;
+    unsigned int playerScore = 0;
 };
 
 struct ButtonDim {
@@ -30,11 +31,14 @@ void RenderScreens(entt::registry &registry);
 void DrawBlackWindow();
 void ButtonStyleSetup();
 
+void DrawHighScore(entt::registry &registry);
+void AddToPlayerScore(unsigned int points);
+
 struct CharacterConfig;
 struct VampiricDrainAttack;
 entt::entity CreateVampireQueen(entt::registry &registry, const CharacterConfig &config,
-                               const VampiricDrainAttack &drain,
-                               const GW::MATH::GMATRIXF &placement);
+                                const VampiricDrainAttack &drain,
+                                const GW::MATH::GMATRIXF &placement);
 void InitializeGameplay(entt::registry &registry);
 void RestartGame(entt::registry &registry);
 void UpdateGameSystems(entt::registry &registry);

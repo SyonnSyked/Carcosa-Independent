@@ -164,6 +164,7 @@ void HandleEntityDeath(entt::registry &registry)
         auto &health = registry.get<Health>(victim);
         if (health.current <= 0) {
             if (registry.all_of<Enemy>(victim)) {
+                AddToPlayerScore(registry.get<Enemy>(victim).scorePoints);
                 if (registry.get<Enemy>(victim).isBoss == true) {
                     DropDungeonKey(registry, registry.get<Transform>(victim));
                 }
