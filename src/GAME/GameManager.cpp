@@ -65,6 +65,20 @@ VampiricDrainAttack LoadVampiricDrain(const GameConfig &settings)
         throw std::runtime_error("Invalid VampireQueen drain tuning: values must be nonnegative");
     return drain; // RequireFloat already rejects nonfinite values.
 }
+     
+SpawnSquiresAttack LoadSquireSpawn(const GameConfig &settings)
+{
+    
+    SpawnSquiresAttack spawn{settings.RequireFloat("UndeadKnight", "squireMin"),
+                             settings.RequireFloat("UndeadKnight", "squireMax"),
+                             settings.RequireFloat("UndeadKnight", "summonCD"),
+                             settings.RequireFloat("UndeadKnight", "spawnRadius")};
+    
+    if(spawn.SquireMin < 0 || spawn.SquireMax < 0 || spawn.CoolDown < 0 || spawn.Radius < 0)
+        throw std::runtime_error("Knight has improper values");
+    return spawn;      
+}
+
 
 HordeSpawner LoadHordeSpawner(const GameConfig &settings)
 {
@@ -188,6 +202,7 @@ void InitializeGameplay(entt::registry &registry)
     const auto &settings = *registry.ctx().get<UTIL::Config>().gameConfig;
     const auto playerConfig = LoadCharacter(registry, "Player");
     const auto enemyConfig = LoadCharacter(registry, "Enemy");
+   
     const auto spawner = LoadHordeSpawner(settings);
     InitializeGameplaySettings(registry, settings);
     InitializeDungeonKeys(registry);
@@ -211,6 +226,7 @@ void InitializeGameplay(entt::registry &registry)
     wizardPlacement.row4.x -= 5.0f;
     wizardPlacement.row4.z += 3.0f;
     CreateEnemyVariant(registry, enemyConfig, wizardPlacement, EnemyVariant::Wizard);
+
     const auto drainConfig = LoadVampiricDrain(settings);
     const auto queenModel = settings.at("VampireQueen").at("model").as<std::string>();
     const auto *models = registry.ctx().find<DRAW::ModelManager>();
@@ -223,6 +239,29 @@ void InitializeGameplay(entt::registry &registry)
                   << " in the selected level (export its H2B and object with gameType != none)."
                   << std::endl;
     }
+
+    const auto KnightSpawnConfig = LoadSquireSpawn(settings);
+    const auto KnightModel = settings.at("UndeadKnight").at("model").as<std::string>();
+    const auto *models = registry.ctx().find<DRAW::ModelManager>();
+    if(models && models->models.contains(KnightModel) &&
+
+        !models->models.at(KnightModel).meshEntities.empty())
+        {
+            const auto KnightConfig = LoadCharacter(registry,"UndeadKnight");
+            CreatUndeadKnight(registry,KnightConfig,KnightSpawnConfig,KnightConfig.transform.matrix);                
+
+        }
+
+        else{
+
+            std::cout << "Undead Knight not spawned: missing dynamic Blender template " << KnightModel
+                     << " in the selected level (export its H2B and object with gameType != none)."
+                    << std::endl;
+
+        }
+
+
+
     const auto spawnerEntity = registry.create();
     registry.emplace<HordeSpawner>(spawnerEntity, spawner);
     registry.emplace<Transform>(spawnerEntity, enemyConfig.transform);
@@ -756,6 +795,30 @@ entt::entity CreateVampireQueen(entt::registry &registry, const CharacterConfig 
         throw;
     }
     return queen;
+}
+
+entt::entity CreatUndeadKnight(entt::registry &registry,const CharacterConfig &config,
+                                    const SpawnSquiresAttack &special,
+                                    const GW::MATH::GMATRIXF &placement)
+{
+    const auto Knight = CreateRenderable(registry,config.model,placement);
+
+  try
+  {
+    registry.emplace<Enemy>(Knight,Enemy{true,0});
+    registry.emplace<UndeadKnight>(Knight);
+    AttachCharacter(registry,Knight,config);
+    auto Attack = special;
+    Attack.Remaining = 0;
+    registry.emplace<SpawnSquiresAttack>(Knight,Attack);
+  }
+
+  catch(...) 
+  {
+    registry.destroy(Knight);
+    throw;
+  }
+  return Knight;
 }
 
 float GroundDistance(entt::registry &registry, entt::entity a, entt::entity b)
