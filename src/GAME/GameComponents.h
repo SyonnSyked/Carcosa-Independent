@@ -34,7 +34,8 @@ struct Enemy {
     int whichKeyToDrop;
 };
 
-enum class EnemyVariant { Melee, Ranged, Wizard };
+enum class EnemyVariant { Melee, Ranged, Wizard, Squire};
+
 
 struct WizardAttack {
     float damage = 15.0f;
@@ -121,8 +122,48 @@ struct BonusStats {
     }
 };
 
-struct VampireQueen {};
+//UndeadKnight stuff
+struct UndeadKnight {};
 
+struct SpawnSquiresAttack 
+{             
+        int SquireMin;
+        int SquireMax;
+        float CoolDown;
+        float Remaining = 0;
+        float Radius;
+};
+
+struct Ring{
+    float Inner;
+    float Outter;
+};
+
+enum class RingState
+{
+    Idle,
+    TeleGraph,
+    Done
+};
+
+struct RingAttackStats
+{
+   
+    Ring Rings[3];
+    RingState state;
+    float Damage;
+    float CoolDown;
+    float Remaining;
+    float WaitTime; // before the damage happens
+
+
+    entt::entity Visuals[3] = {entt::null,entt::null,entt::null};
+
+};
+
+
+//VampireQueen stuff
+struct VampireQueen {};
 struct VampiricDrainAttack {
     float damage, lifeSteal, range;
     float cooldown;
@@ -136,6 +177,8 @@ enum class BounsStatPickUpType {
     CDR,
     CritChance,
     AttackSpeed,
+	HealPot,
+	IncreaseMaxHp,
 };
 
 struct DungeonKey {

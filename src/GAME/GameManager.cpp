@@ -69,14 +69,53 @@ VampiricDrainAttack LoadVampiricDrain(const GameConfig &settings)
 SpawnSquiresAttack LoadSquireSpawn(const GameConfig &settings)
 {
     
-    SpawnSquiresAttack spawn{settings.RequireFloat("UndeadKnight", "squireMin"),
-                             settings.RequireFloat("UndeadKnight", "squireMax"),
-                             settings.RequireFloat("UndeadKnight", "summonCD"),
-                             settings.RequireFloat("UndeadKnight", "spawnRadius")};
+    SpawnSquiresAttack spawn;
+    spawn.SquireMin = settings.RequireFloat("UndeadKnight", "squireMin");
+    spawn.SquireMax = settings.RequireFloat("UndeadKnight", "squireMax");
+    spawn.CoolDown =  settings.RequireFloat("UndeadKnight", "summonCD");
+    spawn.Radius = settings.RequireFloat("UndeadKnight", "spawnRadius");
     
     if(spawn.SquireMin < 0 || spawn.SquireMax < 0 || spawn.CoolDown < 0 || spawn.Radius < 0)
         throw std::runtime_error("Knight has improper values");
     return spawn;      
+}
+
+RingAttackStats LoadKnightRingAttack(const GameConfig &settings)
+{
+    RingAttackStats Ring;
+
+    Ring.CoolDown = settings.RequireFloat("UndeadKnight","CoolDown");
+    Ring.Damage = settings.RequireFloat("UndeadKnight", "ringDamage");
+    Ring.WaitTime = settings.RequireFloat("UndeadKnight", "WaitTime");
+
+    Ring.Rings[0] = ReturnRingRadius(settings,"UndeadKnight", "ring1");
+    Ring.Rings[1] = ReturnRingRadius(settings, "UndeadKnight", "ring2");
+    Ring.Rings[3] = ReturnRingRadius(settings, "UndeadKnight", "ring3");
+
+    Ring.state = RingState::Idle;
+    Ring.CoolDown = 0;
+
+    return Ring;
+
+}
+
+Ring ReturnRingRadius(const GameConfig& settings, const std::string& section, const std::string& key)
+{
+    std::string raw = settings.at(section).at(key).as<std::string>();
+
+    for(char& c : raw)
+        {
+            if (c == ',') 
+                c = ' ';
+        }
+
+
+    std::stringstream ss(raw);
+    Ring ring;
+
+    ss >> ring.Inner >> ring.Outter;
+
+    return ring;
 }
 
 
@@ -241,6 +280,7 @@ void InitializeGameplay(entt::registry &registry)
     }
 
     const auto KnightSpawnConfig = LoadSquireSpawn(settings);
+    const auto KnightRingAttack = LoadKnightRingAttack(settings);
     const auto KnightModel = settings.at("UndeadKnight").at("model").as<std::string>();
     const auto *models = registry.ctx().find<DRAW::ModelManager>();
     if(models && models->models.contains(KnightModel) &&
@@ -799,6 +839,7 @@ entt::entity CreateVampireQueen(entt::registry &registry, const CharacterConfig 
 
 entt::entity CreatUndeadKnight(entt::registry &registry,const CharacterConfig &config,
                                     const SpawnSquiresAttack &special,
+                                    const RingAttackStats &special2,
                                     const GW::MATH::GMATRIXF &placement)
 {
     const auto Knight = CreateRenderable(registry,config.model,placement);
@@ -808,9 +849,12 @@ entt::entity CreatUndeadKnight(entt::registry &registry,const CharacterConfig &c
     registry.emplace<Enemy>(Knight,Enemy{true,0});
     registry.emplace<UndeadKnight>(Knight);
     AttachCharacter(registry,Knight,config);
-    auto Attack = special;
-    Attack.Remaining = 0;
-    registry.emplace<SpawnSquiresAttack>(Knight,Attack);
+    auto SpawnSquires = special;
+    auto RingAttack = special2;
+    SpawnSquires.Remaining = 0;
+    RingAttack.Remaining = 0;
+    registry.emplace<SpawnSquiresAttack>(Knight,SpawnSquires);
+    registry.emplace<RingAttackStats>(Knight,RingAttack);
   }
 
   catch(...) 
