@@ -155,6 +155,27 @@ bool IsInputDown(GW::INPUT::GInput &input, int key)
     return value > 0;
 }
 
+bool AimAxe(entt::registry &registry, entt::entity player, GVECTORF &target)
+{
+    const auto displays = registry.view<GW::SYSTEM::GWindow, DRAW::VulkanRenderer>();
+    const auto cameras = registry.view<DRAW::Camera>();
+    if (displays.begin() == displays.end() || cameras.empty())
+        return false;
+    GVECTORF nearPoint, farPoint;
+    if (!BuildCursorRay(registry, displays.front(), cameras.front(), nearPoint, farPoint))
+        return false;
+    // Intersect the cursor ray with the player's ground plane, allowing free aiming.
+    const float dy = farPoint.y - nearPoint.y;
+    if (std::abs(dy) < 0.00001f)
+        return false;
+    const float t = (registry.get<Transform>(player).matrix.row4.y - nearPoint.y) / dy;
+    if (t < 0 || t > 1)
+        return false;
+    target = {nearPoint.x + (farPoint.x - nearPoint.x) * t,
+              nearPoint.y + dy * t, nearPoint.z + (farPoint.z - nearPoint.z) * t, 1};
+    return true;
+}
+
     void MovePlayer(entt::registry &registry, entt::entity player, GW::INPUT::GInput &input, float deltaTime)
     {
         const float x = float(IsInputDown(input, G_KEY_D)) - float(IsInputDown(input, G_KEY_A));
@@ -219,6 +240,9 @@ void UpdatePlayer(entt::registry &registry, float deltaTime)
 
         // Pick against the camera and mesh transforms of the displayed frame, before movement.
         const auto target = pressed ? PickEnemy(registry) : entt::null;
+        GVECTORF axeTarget;
+        const bool throwAxe = IsInputDown(input, G_BUTTON_RIGHT) &&
+                              AimAxe(registry, entity, axeTarget);
         // Move the player using keyboard input.
         MovePlayer(registry, entity, input, deltaTime);
 
@@ -235,6 +259,8 @@ void UpdatePlayer(entt::registry &registry, float deltaTime)
         // Activate the Warrior's special ability.
         if (abilityPressed)
             TryWarriorAOE(registry, entity);
+        if (throwAxe)
+            TryThrowAxe(registry, entity, axeTarget);
         if (target != entt::null && registry.all_of<MeleeAttack>(entity) &&
             GroundDistance(registry, entity, target) <= registry.get<MeleeAttack>(entity).range)
             TryMeleeAttack(registry, entity, target);
