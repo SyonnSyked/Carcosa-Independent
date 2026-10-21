@@ -28,6 +28,20 @@ struct WarriorAOE {
     float cooldown = 3.0f;
     float remaining = 0.0f;
 };
+struct AxeThrow {
+    float damageMultiplier = 0.6f;
+    float cooldown = 0.35f;
+    float remaining = 0.0f;
+    float speed = 12.0f;
+    float range = 8.0f;
+};
+struct ThrownAxe {
+    GW::MATH::GVECTORF velocity;
+    float damage;
+    float remaining;
+    float angle = 0.0f;
+    float hitRadius = 0.65f;
+};
 struct Enemy {
     bool isBoss;
 
@@ -43,6 +57,7 @@ struct WizardAttack {
     float cooldown = 3.0f;
     float remaining = 0.0f;
 };
+
 struct SpellArea {
     GW::MATH::GVECTORF center;
     float radius;
@@ -71,15 +86,21 @@ struct Movement {
 
 // Keeps track of a temporary speed boost.
 struct SpeedBoost {
-    float multiplier = 1.5f;  // Player moves 50% faster.
-    float remaining = 10.0f;  // Boost lasts for 10 seconds.
+    float multiplier = 1.5f; // Player moves 50% faster.
+    float remaining = 10.0f; // Boost lasts for 10 seconds.
 };
 struct MeleeAttack {
     float damage, range, cooldown;
     float remaining = 0;
 };
+
+enum class WarriorAbilities { AOESlam, ThrowAxe, JumpSlam, Berserk };
+
+struct Abilities {};
+
 struct Class {
     std::string Type;
+    std::vector<Abilities> classAbilities;
 };
 
 struct Collidable {};
@@ -199,23 +220,12 @@ struct HordeSpawner {
     float wizardWeight = 1;
 };
 
-enum class Screens 
-	{
-		MainMenu,
-		PauseMenu,
-		GameOverMenu,
-		Playing,
-		WinMenu
-	};
+enum class Screens { MainMenu, PauseMenu, GameOverMenu, Playing, WinMenu };
 
-	
-
-	struct ActiveScreen
-	{
-		Screens Active;
-		bool Running = true;
-	};
-
+struct ActiveScreen {
+    Screens Active;
+    bool Running = true;
+};
 
 struct Velocity {
     GW::MATH::GVECTORF vector;
@@ -223,6 +233,7 @@ struct Velocity {
 
 struct CharacterConfig {
     // Initialization recipe, not live ECS state. Transform preserves exported scale/orientation.
+    Class characterClass;
     MeleeAttack attackData;
     Transform transform;
 

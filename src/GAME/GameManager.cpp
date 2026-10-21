@@ -4,6 +4,7 @@
 #include "GameComponents.h"
 #include "GameplaySystems.h"
 #include "imgui.h"
+#include <cstdio>
 #include <sstream>
 
 namespace GAME {
@@ -19,6 +20,8 @@ void AttachCharacter(entt::registry &registry, entt::entity entity, const Charac
     auto attack = config.attackData;
     attack.remaining = 0;
     registry.emplace<MeleeAttack>(entity, attack);
+    //    auto abilities = config.characterClass;
+    //   registry.emplace<Abilities>(entity, abilities);
 }
 
 CharacterConfig LoadCharacter(entt::registry &registry, const char *role)
@@ -26,6 +29,7 @@ CharacterConfig LoadCharacter(entt::registry &registry, const char *role)
     const auto &settings = *registry.ctx().get<UTIL::Config>().gameConfig;
     const auto &tuning = settings.at(role);
     CharacterConfig config;
+    config.characterClass.Type = role;
     config.model = tuning.at("model").as<std::string>();
     config.health = settings.RequireFloat(role, "health");
     config.speed = settings.RequireFloat(role, "speed");
@@ -58,9 +62,9 @@ CharacterConfig LoadCharacter(entt::registry &registry, const char *role)
 VampiricDrainAttack LoadVampiricDrain(const GameConfig &settings)
 {
     VampiricDrainAttack drain{settings.RequireFloat("VampireQueen", "drainDamage"),
-                             settings.RequireFloat("VampireQueen", "drainLifeSteal"),
-                             settings.RequireFloat("VampireQueen", "drainRange"),
-                             settings.RequireFloat("VampireQueen", "drainCooldown")};
+                              settings.RequireFloat("VampireQueen", "drainLifeSteal"),
+                              settings.RequireFloat("VampireQueen", "drainRange"),
+                              settings.RequireFloat("VampireQueen", "drainCooldown")};
     if (drain.damage < 0 || drain.lifeSteal < 0 || drain.range < 0 || drain.cooldown < 0)
         throw std::runtime_error("Invalid VampireQueen drain tuning: values must be nonnegative");
     return drain; // RequireFloat already rejects nonfinite values.
@@ -83,16 +87,15 @@ HordeSpawner LoadHordeSpawner(const GameConfig &settings)
             "Invalid HordeSpawner configuration: check interval, radii and population limits");
     // Older configurations retain equal weights; present values use strict float parsing.
     auto weight = [&](const char *key) {
-        return tuning.find(key) == tuning.end() ? 1.0f :
-            settings.RequireFloat("HordeSpawner", key);
+        return tuning.find(key) == tuning.end() ? 1.0f : settings.RequireFloat("HordeSpawner", key);
     };
     spawner.meleeWeight = weight("meleeWeight");
     spawner.rangedWeight = weight("rangedWeight");
     spawner.wizardWeight = weight("wizardWeight");
     if (spawner.meleeWeight < 0 || spawner.rangedWeight < 0 || spawner.wizardWeight < 0 ||
         (spawner.meleeWeight == 0 && spawner.rangedWeight == 0 && spawner.wizardWeight == 0))
-        throw std::runtime_error(
-            "Invalid HordeSpawner weights: require nonnegative values and at least one positive weight");
+        throw std::runtime_error("Invalid HordeSpawner weights: require nonnegative values and at "
+                                 "least one positive weight");
     return spawner;
 }
 
@@ -200,6 +203,7 @@ void InitializeGameplay(entt::registry &registry)
     registry.emplace<Player>(player);
     registry.emplace<Class>(player, Class{"Warrior"});
     registry.emplace<WarriorAOE>(player);
+    registry.emplace<AxeThrow>(player);
     AttachCharacter(registry, player, playerConfig);
 
     // Testing the health pickup
@@ -209,48 +213,37 @@ void InitializeGameplay(entt::registry &registry)
     potionTransform.matrix.row4.x += 3.0f;
 
     // Trying out the complete health potion model
-    const auto healthPotion =
-        CreateRenderable(registry, "HealthPotion", potionTransform.matrix);
+    const auto healthPotion = CreateRenderable(registry, "HealthPotion", potionTransform.matrix);
 
     // Health pickup restores 25 HP
-    registry.emplace<PickUp>(
-        healthPotion,
-        PickUp{ BounsStatPickUpType::HealthRestore, 25.0f }
-    );
+    registry.emplace<PickUp>(healthPotion, PickUp{BounsStatPickUpType::HealthRestore, 25.0f});
 
     // Lower player health for testing
-    auto& playerHealth = registry.get<Health>(player);
+    auto &playerHealth = registry.get<Health>(player);
     playerHealth.current = (std::max)(0.0f, playerHealth.maximum - 50.0f);
 
     // Debug messages to check if everything works
-    std::cout << "TEST: Health potion spawned 3 units to the right!"
-        << std::endl;
+    std::cout << "TEST: Health potion spawned 3 units to the right!" << std::endl;
 
-    std::cout << "TEST: Player HP is "
-        << playerHealth.current << "/"
-        << playerHealth.maximum << std::endl;
+    std::cout << "TEST: Player HP is " << playerHealth.current << "/" << playerHealth.maximum
+              << std::endl;
 
     // Testing the speed boost potion
 
-// Spawn another potion 7 units to the right of the player.
-// This keeps it separate from our health potion.
+    // Spawn another potion 7 units to the right of the player.
+    // This keeps it separate from our health potion.
     auto speedPotionTransform = playerConfig.transform;
     speedPotionTransform.matrix.row4.x += 7.0f;
 
     // Use the health potion model temporarily.
     // I'll replace it with a blue potion later.
-    const auto speedPotion =
-        CreateRenderable(registry, "SpeedPotion", speedPotionTransform.matrix);
+    const auto speedPotion = CreateRenderable(registry, "SpeedPotion", speedPotionTransform.matrix);
 
     // Give this potion the temporary speed boost effect.
-    registry.emplace<PickUp>(
-        speedPotion,
-        PickUp{ BounsStatPickUpType::BonusSpeed, 0.5f }
-    );
+    registry.emplace<PickUp>(speedPotion, PickUp{BounsStatPickUpType::BonusSpeed, 0.5f});
 
     // Print a message so I know the potion spawned.
-    std::cout << "TEST: Speed potion spawned 7 units to the right!"
-        << std::endl;
+    std::cout << "TEST: Speed potion spawned 7 units to the right!" << std::endl;
 
     CreateEnemy(registry, enemyConfig, enemyConfig.transform.matrix);
     CreateEnemy(registry, enemyConfig, enemyConfig.transform.matrix);
@@ -279,7 +272,8 @@ void InitializeGameplay(entt::registry &registry)
     registry.emplace<HordeSpawner>(spawnerEntity, spawner);
     registry.emplace<Transform>(spawnerEntity, enemyConfig.transform);
     UpdateCamera(registry);
-    std::cout << "Gameplay ready: WASD moves, left-click an enemy in melee range to attack."
+    std::cout << "Gameplay ready: WASD moves, left-click an enemy for melee, hold right-click "
+                 "to throw axes toward the cursor, 1 uses Warrior AOE."
               << std::endl;
 }
 
@@ -294,6 +288,7 @@ void RestartGame(entt::registry &registry)
     collect(registry.view<Player>());
     collect(registry.view<Enemy>());
     collect(registry.view<Projectile>());
+    collect(registry.view<ThrownAxe>());
     collect(registry.view<SpellArea>());
     collect(registry.view<HordeSpawner>());
     collect(registry.view<DungeonKey>());
@@ -307,9 +302,6 @@ void RestartGame(entt::registry &registry)
     InitializeGameplay(registry);
     ChangeScreen(Screens::Playing);
 }
-
-
-
 
 void UpdateGameSystems(entt::registry &registry)
 {
@@ -350,6 +342,7 @@ void UpdateGameSystems(entt::registry &registry)
         DestroyPendingEntities(registry);
         return;
     }
+    UpdateThrownAxes(registry, deltaTime);
     UpdateVampireQueen(registry, deltaTime);
     if (CurrentState.ActiveScreen != Screens::Playing) {
         DestroyPendingEntities(registry);
@@ -392,8 +385,8 @@ entt::entity CreateEnemyVariant(entt::registry &registry, const CharacterConfig 
         if (variant != EnemyVariant::Melee) {
             for (auto mesh : registry.get<DRAW::MeshCollection>(enemy).meshEntities)
                 registry.get<DRAW::GPUInstance>(mesh).matData.Kd =
-                    variant == EnemyVariant::Ranged ? H2B::VECTOR{1.0f, 0.35f, 0.05f} :
-                                                     H2B::VECTOR{0.65f, 0.1f, 1.0f};
+                    variant == EnemyVariant::Ranged ? H2B::VECTOR{1.0f, 0.35f, 0.05f}
+                                                    : H2B::VECTOR{0.65f, 0.1f, 1.0f};
         }
     } catch (...) {
         registry.destroy(enemy); // Same owned-mesh cleanup as CreateEnemy.
@@ -404,34 +397,111 @@ entt::entity CreateEnemyVariant(entt::registry &registry, const CharacterConfig 
 
 void ChangeScreen(Screens s)
 {
-    CurrentState.ActiveScreen=s;
+    CurrentState.ActiveScreen = s;
 }
+
+namespace {
+void DrawPlayerHUD(entt::registry &registry)
+{
+    const auto players = registry.view<Player, Health>(entt::exclude<ToDestroy>);
+    if (players.begin() == players.end())
+        return;
+    const auto player = players.front();
+    const auto &health = registry.get<Health>(player);
+    const auto *viewport = ImGui::GetMainViewport();
+    if (viewport->Size.x <= 0 || viewport->Size.y <= 0)
+        return;
+    const float scale = (std::min)(1.5f, (std::min)(viewport->Size.x / 1280.0f,
+                                                   viewport->Size.y / 720.0f));
+    const float left = viewport->Pos.x + (viewport->Size.x - 452 * scale) * 0.5f;
+    const float top = viewport->Pos.y + viewport->Size.y - 160 * scale;
+    // Draw-list primitives create no widgets/windows that could capture combat input.
+    auto *draw = ImGui::GetBackgroundDrawList();
+    const ImU32 panel = IM_COL32(16, 18, 17, 235);
+    const ImU32 border = IM_COL32(139, 121, 79, 255);
+    const ImU32 gold = IM_COL32(222, 195, 129, 255);
+    const ImU32 text = IM_COL32(235, 229, 211, 255);
+    const ImU32 muted = IM_COL32(157, 157, 146, 255);
+    auto point = [&](float x, float y) { return ImVec2(left + x * scale, top + y * scale); };
+    auto label = [&](float x, float y, float size, ImU32 color, const char *value) {
+        draw->AddText(ImGui::GetFont(), size * scale, point(x, y), color, value);
+    };
+    auto centered = [&](float x, float y, float width, float size, ImU32 color, const char *value) {
+        const float textWidth = ImGui::GetFont()->CalcTextSizeA(size * scale, FLT_MAX, 0, value).x;
+        draw->AddText(ImGui::GetFont(), size * scale,
+                      ImVec2(left + (x + width * 0.5f) * scale - textWidth * 0.5f,
+                             top + y * scale), color, value);
+    };
+
+    draw->AddRectFilled(point(0, 0), point(452, 142), panel, 6 * scale);
+    draw->AddRect(point(0, 0), point(452, 142), border, 6 * scale);
+    label(14, 10, 14, gold, "WARRIOR");
+    const float maximum = std::isfinite(health.maximum) ? (std::max)(0.0f, health.maximum) : 0;
+    const float current = std::isfinite(health.current) ? (std::clamp)(health.current, 0.0f, maximum) : 0;
+    char hp[64];
+    std::snprintf(hp, sizeof(hp), "HP  %.0f / %.0f", current, maximum);
+    label(270, 10, 14, text, hp);
+    draw->AddRectFilled(point(14, 31), point(438, 47), IM_COL32(45, 27, 27, 255), 3 * scale);
+    const float fraction = maximum > 0 ? current / maximum : 0;
+    if (fraction > 0)
+        draw->AddRectFilled(point(14, 31), point(14 + 424 * fraction, 47),
+                            fraction <= 0.25f ? IM_COL32(225, 63, 53, 255) : IM_COL32(171, 49, 48, 255),
+                            3 * scale);
+
+    auto slot = [&](int index, const char *key, const char *name, bool available,
+                    float remaining, float cooldown) {
+        const float x = 14.0f + index * 144.0f;
+        const float time = std::isfinite(remaining) ? (std::max)(0.0f, remaining) : 0;
+        const bool ready = available && current > 0 && time <= 0;
+        draw->AddRectFilled(point(x, 58), point(x + 136, 129), IM_COL32(29, 31, 28, 255), 3 * scale);
+        draw->AddRect(point(x, 58), point(x + 136, 129), ready ? border : IM_COL32(65, 66, 59, 255), 3 * scale);
+        label(x + 8, 64, 12, gold, key);
+        centered(x, 82, 136, 17, available ? text : muted, name);
+        char status[24];
+        if (!available || current <= 0)
+            std::snprintf(status, sizeof(status), "Unavailable");
+        else if (ready)
+            std::snprintf(status, sizeof(status), "Ready");
+        else
+            std::snprintf(status, sizeof(status), "%.1fs", std::ceil(time * 10) / 10);
+        centered(x, 104, 136, 12, ready ? gold : muted, status);
+        const float progress = !available || current <= 0 ? 0 : ready ? 1 :
+            cooldown > 0 ? (std::clamp)(1 - time / cooldown, 0.0f, 1.0f) : 0;
+        draw->AddRectFilled(point(x + 6, 122), point(x + 130, 125), IM_COL32(47, 48, 42, 255));
+        if (progress > 0)
+            draw->AddRectFilled(point(x + 6, 122), point(x + 6 + 124 * progress, 125), ready ? gold : border);
+    };
+    const auto *melee = registry.try_get<MeleeAttack>(player);
+    const auto *axe = registry.try_get<AxeThrow>(player);
+    const auto *aoe = registry.try_get<WarriorAOE>(player);
+    slot(0, "LEFT CLICK", "Melee", melee != nullptr, melee ? melee->remaining : 0, melee ? melee->cooldown : 0);
+    slot(1, "RIGHT CLICK", "Axe throw", axe != nullptr, axe ? axe->remaining : 0, axe ? axe->cooldown : 0);
+    slot(2, "1", "AOE slam", aoe != nullptr, aoe ? aoe->remaining : 0, aoe ? aoe->cooldown : 0);
+}
+} // namespace
 
 void RenderScreens(entt::registry &registry)
 {
- switch (CurrentState.ActiveScreen)
- {
- case Screens::Playing: // need my man to put the regular rendering stuff in here
-    //for if we want a hud and what not
-   
-   break;
-case Screens::MainMenu:
-    DrawBlackWindow();
-    DrawMainMenu(registry);
-    break;
-case Screens::PauseMenu:   
-    DrawPauseMenu();
-    break;
-case Screens::GameOverMenu:
-    DrawBlackWindow();
-    DrawGameOver(registry);
-    break;
-case Screens::WinMenu:
-    DrawBlackWindow();
-    DrawWinScreen(registry);
-    break;
-
- }
+    switch (CurrentState.ActiveScreen) {
+        case Screens::Playing:
+            DrawPlayerHUD(registry);
+            break;
+        case Screens::MainMenu:
+            DrawBlackWindow();
+            DrawMainMenu(registry);
+            break;
+        case Screens::PauseMenu:
+            DrawPauseMenu();
+            break;
+        case Screens::GameOverMenu:
+            DrawBlackWindow();
+            DrawGameOver(registry);
+            break;
+        case Screens::WinMenu:
+            DrawBlackWindow();
+            DrawWinScreen(registry);
+            break;
+    }
 }
 
 namespace {
@@ -444,7 +514,8 @@ struct MenuPresentation {
 
 struct MenuSettings {
     // Storage only: every presentation value is required from game.ini.
-    ImVec4 background{}, parchment{}, brass{}, gold{}, highlight{}, inkText{}, mutedText{}, danger{};
+    ImVec4 background{}, parchment{}, brass{}, gold{}, highlight{}, inkText{}, mutedText{},
+        danger{};
     ImVec4 button{}, buttonHovered{}, buttonActive{};
     float panelWidth{}, buttonWidth{}, buttonHeight{}, buttonSpacing{};
     float mainTitleSize{}, headingSize{}, subtitleSize{}, footerSize{}, buttonTextSize{};
@@ -457,7 +528,8 @@ std::string RequireMenuValue(const GameConfig &settings, const char *section, co
 {
     const auto found = settings.find(section);
     if (found == settings.end() || found->second.find(key) == found->second.end())
-        throw std::runtime_error(std::string("Missing required menu configuration: ") + section + "." + key);
+        throw std::runtime_error(std::string("Missing required menu configuration: ") + section +
+                                 "." + key);
     return found->second.at(key).as<std::string>();
 }
 
@@ -473,22 +545,31 @@ MenuSettings LoadMenuSettings(const GameConfig &settings)
         std::istringstream input(RequireMenuValue(settings, "MenuTheme", key));
         char comma1 = 0, comma2 = 0;
         ImVec4 parsed(0, 0, 0, 1);
-        if (!(input >> parsed.x >> comma1 >> parsed.y >> comma2 >> parsed.z) ||
-            comma1 != ',' || comma2 != ',' || !(input >> std::ws).eof() ||
-            !std::isfinite(parsed.x) || !std::isfinite(parsed.y) || !std::isfinite(parsed.z) ||
-            parsed.x < 0 || parsed.x > 1 || parsed.y < 0 || parsed.y > 1 || parsed.z < 0 || parsed.z > 1)
-            throw std::runtime_error(std::string("Invalid MenuTheme.") + key + ": expected R,G,B in [0,1]");
+        if (!(input >> parsed.x >> comma1 >> parsed.y >> comma2 >> parsed.z) || comma1 != ',' ||
+            comma2 != ',' || !(input >> std::ws).eof() || !std::isfinite(parsed.x) ||
+            !std::isfinite(parsed.y) || !std::isfinite(parsed.z) || parsed.x < 0 || parsed.x > 1 ||
+            parsed.y < 0 || parsed.y > 1 || parsed.z < 0 || parsed.z > 1)
+            throw std::runtime_error(std::string("Invalid MenuTheme.") + key +
+                                     ": expected R,G,B in [0,1]");
         value = parsed;
     };
-    color("background", result.background); color("parchment", result.parchment);
-    color("brass", result.brass); color("gold", result.gold); color("highlight", result.highlight);
-    color("text", result.inkText); color("mutedText", result.mutedText); color("danger", result.danger);
-    color("button", result.button); color("buttonHovered", result.buttonHovered); color("buttonActive", result.buttonActive);
+    color("background", result.background);
+    color("parchment", result.parchment);
+    color("brass", result.brass);
+    color("gold", result.gold);
+    color("highlight", result.highlight);
+    color("text", result.inkText);
+    color("mutedText", result.mutedText);
+    color("danger", result.danger);
+    color("button", result.button);
+    color("buttonHovered", result.buttonHovered);
+    color("buttonActive", result.buttonActive);
     auto dimension = [&](const char *key, float &value, float minimum, float maximum) {
         RequireMenuValue(settings, "MenuLayout", key);
         value = settings.RequireFloat("MenuLayout", key);
         if (value < minimum || value > maximum)
-            throw std::runtime_error(std::string("Invalid MenuLayout.") + key + ": outside supported range");
+            throw std::runtime_error(std::string("Invalid MenuLayout.") + key +
+                                     ": outside supported range");
     };
     dimension("panelWidth", result.panelWidth, 520, 800);
     dimension("buttonWidth", result.buttonWidth, 160, 440);
@@ -508,11 +589,21 @@ MenuSettings LoadMenuSettings(const GameConfig &settings)
         for (auto action : actions) {
             const char *key = nullptr;
             switch (action) {
-            case MenuAction::Start: key = "startLabel"; break;
-            case MenuAction::Resume: key = "resumeLabel"; break;
-            case MenuAction::MainMenu: key = "mainMenuLabel"; break;
-            case MenuAction::Restart: key = "restartLabel"; break;
-            case MenuAction::Quit: key = "quitLabel"; break;
+                case MenuAction::Start:
+                    key = "startLabel";
+                    break;
+                case MenuAction::Resume:
+                    key = "resumeLabel";
+                    break;
+                case MenuAction::MainMenu:
+                    key = "mainMenuLabel";
+                    break;
+                case MenuAction::Restart:
+                    key = "restartLabel";
+                    break;
+                case MenuAction::Quit:
+                    key = "quitLabel";
+                    break;
             }
             text(section, key, presentation.buttons[action]);
         }
@@ -524,12 +615,12 @@ MenuSettings LoadMenuSettings(const GameConfig &settings)
     return result;
 }
 constexpr ImGuiCol menuColors[] = {
-    ImGuiCol_WindowBg, ImGuiCol_Border, ImGuiCol_Text, ImGuiCol_TextDisabled,
-    ImGuiCol_Button, ImGuiCol_ButtonHovered, ImGuiCol_ButtonActive,
-    ImGuiCol_FrameBg, ImGuiCol_FrameBgHovered, ImGuiCol_FrameBgActive,
-    ImGuiCol_Header, ImGuiCol_HeaderHovered, ImGuiCol_HeaderActive,
-    ImGuiCol_Separator, ImGuiCol_SeparatorHovered, ImGuiCol_SeparatorActive,
-    ImGuiCol_NavCursor};
+    ImGuiCol_WindowBg,        ImGuiCol_Border,    ImGuiCol_Text,
+    ImGuiCol_TextDisabled,    ImGuiCol_Button,    ImGuiCol_ButtonHovered,
+    ImGuiCol_ButtonActive,    ImGuiCol_FrameBg,   ImGuiCol_FrameBgHovered,
+    ImGuiCol_FrameBgActive,   ImGuiCol_Header,    ImGuiCol_HeaderHovered,
+    ImGuiCol_HeaderActive,    ImGuiCol_Separator, ImGuiCol_SeparatorHovered,
+    ImGuiCol_SeparatorActive, ImGuiCol_NavCursor};
 
 struct MenuLayout {
     ImVec2 origin;
@@ -537,8 +628,7 @@ struct MenuLayout {
     int buttonIndex = 0;
 };
 
-void MenuText(const MenuLayout &layout, const char *text, float y, float size,
-              const ImVec4 &color)
+void MenuText(const MenuLayout &layout, const char *text, float y, float size, const ImVec4 &color)
 {
     ImGui::PushFont(nullptr, size * layout.scale);
     float width = ImGui::CalcTextSize(text).x;
@@ -556,8 +646,10 @@ void MenuText(const MenuLayout &layout, const char *text, float y, float size,
 
 void MenuDiamond(ImDrawList *draw, ImVec2 center, float radius, ImU32 color)
 {
-    const ImVec2 points[] = {{center.x, center.y - radius}, {center.x + radius, center.y},
-                            {center.x, center.y + radius}, {center.x - radius, center.y}};
+    const ImVec2 points[] = {{center.x, center.y - radius},
+                             {center.x + radius, center.y},
+                             {center.x, center.y + radius},
+                             {center.x - radius, center.y}};
     draw->AddPolyline(points, 4, color, ImDrawFlags_Closed, 1.0f);
 }
 
@@ -567,23 +659,26 @@ ImU32 MenuColor(ImVec4 color, float alpha = 1.0f)
     return ImGui::ColorConvertFloat4ToU32(color);
 }
 
-void DrawMenuFrame(const MenuLayout& layout, bool mainMenu, bool gameOver)
+void DrawMenuFrame(const MenuLayout &layout, bool mainMenu, bool gameOver)
 {
-    const auto* viewport = ImGui::GetMainViewport();
+    const auto *viewport = ImGui::GetMainViewport();
     const auto size = viewport->Size;
-    auto* draw = ImGui::GetWindowDrawList();
+    auto *draw = ImGui::GetWindowDrawList();
     const float cx = layout.center, top = layout.top, s = layout.scale;
     const float halfWidth = menuSettings.panelWidth * 0.5f;
     const ImU32 edge = ImGui::ColorConvertFloat4ToU32(menuSettings.brass);
-    const ImU32 accent = ImGui::ColorConvertFloat4ToU32(gameOver ? menuSettings.danger : menuSettings.gold);
+    const ImU32 accent =
+        ImGui::ColorConvertFloat4ToU32(gameOver ? menuSettings.danger : menuSettings.gold);
     // Inset stage and manuscript borders; all decoration belongs to this one menu window.
     draw->AddRectFilled(viewport->Pos, ImVec2(viewport->Pos.x + size.x, viewport->Pos.y + size.y),
-        MenuColor(menuSettings.background, mainMenu ? 1.0f : 235 / 255.0f));
+                        MenuColor(menuSettings.background, mainMenu ? 1.0f : 235 / 255.0f));
     draw->AddRectFilled(ImVec2(cx - halfWidth * s, top), ImVec2(cx + halfWidth * s, top + 610 * s),
-        ImGui::ColorConvertFloat4ToU32(menuSettings.parchment));
-    draw->AddRect(ImVec2(cx - (halfWidth - 10) * s, top + 10 * s), ImVec2(cx + (halfWidth - 10) * s, top + 600 * s), edge);
-    draw->AddRect(ImVec2(cx - (halfWidth - 18) * s, top + 18 * s), ImVec2(cx + (halfWidth - 18) * s, top + 592 * s),
-        MenuColor(menuSettings.brass, 65 / 255.0f));
+                        ImGui::ColorConvertFloat4ToU32(menuSettings.parchment));
+    draw->AddRect(ImVec2(cx - (halfWidth - 10) * s, top + 10 * s),
+                  ImVec2(cx + (halfWidth - 10) * s, top + 600 * s), edge);
+    draw->AddRect(ImVec2(cx - (halfWidth - 18) * s, top + 18 * s),
+                  ImVec2(cx + (halfWidth - 18) * s, top + 592 * s),
+                  MenuColor(menuSettings.brass, 65 / 255.0f));
     for (int side : {-1, 1}) {
         const float x = cx + side * (halfWidth - 31) * s;
         for (float y : {top + 31 * s, top + 579 * s}) {
@@ -595,7 +690,8 @@ void DrawMenuFrame(const MenuLayout& layout, bool mainMenu, bool gameOver)
         for (int i = 0; i < 3; ++i) {
             const float wing = cx + side * (halfWidth + 40 + 22 * i) * s;
             draw->AddLine(ImVec2(wing, top + (90 + 20 * i) * s),
-                ImVec2(wing, top + (520 - 20 * i) * s), MenuColor(menuSettings.brass, 25 / 255.0f));
+                          ImVec2(wing, top + (520 - 20 * i) * s),
+                          MenuColor(menuSettings.brass, 25 / 255.0f));
         }
     }
 }
@@ -607,23 +703,22 @@ void DrawMenuSeal(const MenuLayout &layout, bool gameOver)
     const auto edge = MenuColor(menuSettings.brass);
     const auto accent = MenuColor(gameOver ? menuSettings.danger : menuSettings.gold);
     // Original seal: a pierced diamond, concentric rings, and a split crown.
-    const ImVec2 seal(cx, top + 107*s);
-    MenuDiamond(draw, seal, 31*s, accent);
-    draw->AddCircle(seal, 21*s, edge, 32);
-    draw->AddCircle(seal, 8*s, accent, 24);
-    draw->AddLine(ImVec2(cx, seal.y - 40*s), ImVec2(cx, seal.y + 40*s), edge);
-    draw->AddLine(ImVec2(cx - 10*s, seal.y - 24*s), ImVec2(cx, seal.y - 40*s), edge);
-    draw->AddLine(ImVec2(cx + 10*s, seal.y - 24*s), ImVec2(cx, seal.y - 40*s), edge);
-
+    const ImVec2 seal(cx, top + 107 * s);
+    MenuDiamond(draw, seal, 31 * s, accent);
+    draw->AddCircle(seal, 21 * s, edge, 32);
+    draw->AddCircle(seal, 8 * s, accent, 24);
+    draw->AddLine(ImVec2(cx, seal.y - 40 * s), ImVec2(cx, seal.y + 40 * s), edge);
+    draw->AddLine(ImVec2(cx - 10 * s, seal.y - 24 * s), ImVec2(cx, seal.y - 40 * s), edge);
+    draw->AddLine(ImVec2(cx + 10 * s, seal.y - 24 * s), ImVec2(cx, seal.y - 40 * s), edge);
 }
 
-MenuLayout BeginMenu(const char *id, const MenuPresentation &presentation,
-                     bool mainMenu = false, bool gameOver = false)
+MenuLayout BeginMenu(const char *id, const MenuPresentation &presentation, bool mainMenu = false,
+                     bool gameOver = false)
 {
     const auto *viewport = ImGui::GetMainViewport();
     const auto size = viewport->Size;
-    const float scale = (std::max)(0.1f, (std::min)(1.4f,
-        (std::min)(size.x / 1280.0f, size.y / 720.0f)));
+    const float scale =
+        (std::max)(0.1f, (std::min)(1.4f, (std::min)(size.x / 1280.0f, size.y / 720.0f)));
     MenuLayout layout{viewport->Pos, viewport->Pos.x + size.x * 0.5f,
                       viewport->Pos.y + (size.y - 610 * scale) * 0.5f, scale};
     for (auto color : menuColors)
@@ -638,9 +733,10 @@ MenuLayout BeginMenu(const char *id, const MenuPresentation &presentation,
     ImGui::PushStyleVar(ImGuiStyleVar_ButtonTextAlign, ImVec2(0.5f, 0.5f));
     ImGui::SetNextWindowPos(viewport->Pos, ImGuiCond_Always);
     ImGui::SetNextWindowSize(size, ImGuiCond_Always);
-    ImGui::Begin(id, nullptr, ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize |
-        ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse |
-        ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollWithMouse);
+    ImGui::Begin(id, nullptr,
+                 ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoMove |
+                     ImGuiWindowFlags_NoScrollbar | ImGuiWindowFlags_NoCollapse |
+                     ImGuiWindowFlags_NoSavedSettings | ImGuiWindowFlags_NoScrollWithMouse);
 
     DrawMenuFrame(layout, mainMenu, gameOver);
     DrawMenuSeal(layout, gameOver);
@@ -648,16 +744,19 @@ MenuLayout BeginMenu(const char *id, const MenuPresentation &presentation,
     const float cx = layout.center, top = layout.top, s = scale;
     const auto edge = MenuColor(menuSettings.brass);
     const auto accent = MenuColor(gameOver ? menuSettings.danger : menuSettings.gold);
-    MenuText(layout, presentation.subtitle.c_str(), 47, menuSettings.subtitleSize, menuSettings.mutedText);
+    MenuText(layout, presentation.subtitle.c_str(), 47, menuSettings.subtitleSize,
+             menuSettings.mutedText);
     MenuText(layout, presentation.title.c_str(), 162,
              mainMenu ? menuSettings.mainTitleSize : menuSettings.headingSize,
              gameOver ? menuSettings.inkText : menuSettings.highlight);
-    MenuText(layout, presentation.tagline.c_str(), 242, menuSettings.subtitleSize, menuSettings.brass);
-    const float dividerY = top + 285*s;
-    draw->AddLine(ImVec2(cx - 180*s, dividerY), ImVec2(cx - 17*s, dividerY), edge);
-    draw->AddLine(ImVec2(cx + 17*s, dividerY), ImVec2(cx + 180*s, dividerY), edge);
-    MenuDiamond(draw, ImVec2(cx, dividerY), 5*s, accent);
-    MenuText(layout, presentation.footer.c_str(), 556, menuSettings.footerSize, menuSettings.mutedText);
+    MenuText(layout, presentation.tagline.c_str(), 242, menuSettings.subtitleSize,
+             menuSettings.brass);
+    const float dividerY = top + 285 * s;
+    draw->AddLine(ImVec2(cx - 180 * s, dividerY), ImVec2(cx - 17 * s, dividerY), edge);
+    draw->AddLine(ImVec2(cx + 17 * s, dividerY), ImVec2(cx + 180 * s, dividerY), edge);
+    MenuDiamond(draw, ImVec2(cx, dividerY), 5 * s, accent);
+    MenuText(layout, presentation.footer.c_str(), 556, menuSettings.footerSize,
+             menuSettings.mutedText);
     ImGui::PushFont(nullptr, menuSettings.buttonTextSize * s);
     return layout;
 }
@@ -670,21 +769,31 @@ bool MenuButton(MenuLayout &layout, const char *label)
     const bool fitLabel = labelWidth > availableWidth;
     if (fitLabel)
         ImGui::PushFont(nullptr, menuSettings.buttonTextSize * s * availableWidth / labelWidth);
-    ImGui::SetCursorScreenPos(ImVec2(layout.center - menuSettings.buttonWidth * 0.5f * s,
-        layout.top + (324 + layout.buttonIndex++ * (menuSettings.buttonHeight + menuSettings.buttonSpacing))*s));
-    const bool pressed = ImGui::Button(label, ImVec2(menuSettings.buttonWidth*s, menuSettings.buttonHeight*s));
+    ImGui::SetCursorScreenPos(
+        ImVec2(layout.center - menuSettings.buttonWidth * 0.5f * s,
+               layout.top + (324 + layout.buttonIndex++ *
+                                       (menuSettings.buttonHeight + menuSettings.buttonSpacing)) *
+                                s));
+    const bool pressed =
+        ImGui::Button(label, ImVec2(menuSettings.buttonWidth * s, menuSettings.buttonHeight * s));
     const bool hovered = ImGui::IsItemHovered();
     const bool active = ImGui::IsItemActive();
     auto *draw = ImGui::GetWindowDrawList();
     const auto a = ImGui::GetItemRectMin(), b = ImGui::GetItemRectMax();
-    draw->AddRect(a, b, ImGui::ColorConvertFloat4ToU32(hovered ? menuSettings.highlight : menuSettings.brass), 1.5f*s);
+    draw->AddRect(
+        a, b, ImGui::ColorConvertFloat4ToU32(hovered ? menuSettings.highlight : menuSettings.brass),
+        1.5f * s);
     // Overlay only the label for hover/press contrast; hitboxes remain native ImGui buttons.
     if (hovered || active) {
         const auto textSize = ImGui::CalcTextSize(label);
-        draw->AddRectFilled(ImVec2(a.x + 2, a.y + 2), ImVec2(b.x - 2, b.y - 2),
-            ImGui::ColorConvertFloat4ToU32(buttonStyle.Colors[active ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered]));
-        draw->AddText(ImVec2((a.x + b.x - textSize.x)*0.5f, (a.y + b.y - textSize.y)*0.5f),
-                      ImGui::ColorConvertFloat4ToU32(active ? menuSettings.inkText : menuSettings.highlight), label);
+        draw->AddRectFilled(
+            ImVec2(a.x + 2, a.y + 2), ImVec2(b.x - 2, b.y - 2),
+            ImGui::ColorConvertFloat4ToU32(
+                buttonStyle.Colors[active ? ImGuiCol_ButtonActive : ImGuiCol_ButtonHovered]));
+        draw->AddText(
+            ImVec2((a.x + b.x - textSize.x) * 0.5f, (a.y + b.y - textSize.y) * 0.5f),
+            ImGui::ColorConvertFloat4ToU32(active ? menuSettings.inkText : menuSettings.highlight),
+            label);
     }
     if (fitLabel)
         ImGui::PopFont();
@@ -702,15 +811,24 @@ void EndMenu()
 class ScopedMenu {
     const MenuPresentation &presentation;
     MenuLayout layout;
-public:
-    ScopedMenu(const char *id, const MenuPresentation &data, bool mainMenu = false, bool gameOver = false)
-        : presentation(data), layout(BeginMenu(id, data, mainMenu, gameOver)) {}
-    ~ScopedMenu() { EndMenu(); }
+
+  public:
+    ScopedMenu(const char *id, const MenuPresentation &data, bool mainMenu = false,
+               bool gameOver = false)
+        : presentation(data), layout(BeginMenu(id, data, mainMenu, gameOver))
+    {
+    }
+    ~ScopedMenu()
+    {
+        EndMenu();
+    }
     ScopedMenu(const ScopedMenu &) = delete;
     ScopedMenu &operator=(const ScopedMenu &) = delete;
-    bool Button(MenuAction action) {
+    bool Button(MenuAction action)
+    {
         const auto &label = presentation.buttons.at(action);
-        ImGui::PushID(static_cast<int>(action)); // Labels never determine which action is performed.
+        ImGui::PushID(
+            static_cast<int>(action)); // Labels never determine which action is performed.
         const bool pressed = MenuButton(layout, label.c_str());
         ImGui::PopID();
         return pressed;
@@ -784,15 +902,15 @@ void DrawWinScreen(entt::registry &registry)
 void DrawBlackWindow()
 {
     const auto *viewport = ImGui::GetMainViewport();
-    ImGui::GetBackgroundDrawList()->AddRectFilled(viewport->Pos,
+    ImGui::GetBackgroundDrawList()->AddRectFilled(
+        viewport->Pos,
         ImVec2(viewport->Pos.x + viewport->Size.x, viewport->Pos.y + viewport->Size.y),
         MenuColor(menuSettings.background));
 }
 
-
 entt::entity CreateVampireQueen(entt::registry &registry, const CharacterConfig &config,
-                               const VampiricDrainAttack &drain,
-                               const GW::MATH::GMATRIXF &placement)
+                                const VampiricDrainAttack &drain,
+                                const GW::MATH::GMATRIXF &placement)
 {
     const auto queen = CreateRenderable(registry, config.model, placement);
     try {
