@@ -94,7 +94,7 @@ RingAttackStats LoadKnightRingAttack(const GameConfig &settings)
 
     Ring.Rings[0] = ReturnRingRadius(settings,"UndeadKnight", "ring1");
     Ring.Rings[1] = ReturnRingRadius(settings, "UndeadKnight", "ring2");
-    Ring.Rings[3] = ReturnRingRadius(settings, "UndeadKnight", "ring3");
+    Ring.Rings[2] = ReturnRingRadius(settings, "UndeadKnight", "ring3");
 
     Ring.state = RingState::Idle;
     Ring.CoolDown = 0;
@@ -289,13 +289,13 @@ void InitializeGameplay(entt::registry &registry)
     const auto KnightSpawnConfig = LoadSquireSpawn(settings);
     const auto KnightRingAttack = LoadKnightRingAttack(settings);
     const auto KnightModel = settings.at("UndeadKnight").at("model").as<std::string>();
-    const auto *models = registry.ctx().find<DRAW::ModelManager>();
+    
     if(models && models->models.contains(KnightModel) &&
 
         !models->models.at(KnightModel).meshEntities.empty())
         {
             const auto KnightConfig = LoadCharacter(registry,"UndeadKnight");
-            CreatUndeadKnight(registry,KnightConfig,KnightSpawnConfig,KnightConfig.transform.matrix);                
+            CreateUndeadKnight(registry,KnightConfig,KnightSpawnConfig,KnightConfig.transform.matrix);                
 
         }
 

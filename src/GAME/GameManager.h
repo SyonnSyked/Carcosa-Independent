@@ -35,6 +35,9 @@ struct VampiricDrainAttack;
 entt::entity CreateVampireQueen(entt::registry &registry, const CharacterConfig &config,
                                const VampiricDrainAttack &drain,
                                const GW::MATH::GMATRIXF &placement);
+entt::entity CreateUndeadKnight(entt::registry &registry, const CharacterConfig &config,
+                               const VampiricDrainAttack &drain,
+                               const GW::MATH::GMATRIXF &placement);
 void InitializeGameplay(entt::registry &registry);
 void RestartGame(entt::registry &registry);
 void UpdateGameSystems(entt::registry &registry);
