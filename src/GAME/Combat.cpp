@@ -7,6 +7,17 @@
 
 namespace GAME {
 
+    // Tracks the number of enemies defeated during the current game.
+    static int totalEnemyKills = 0;
+
+    // Resets the kill counter when a new game begins.
+    void ResetEnemyKillCounter()
+    {
+        totalEnemyKills = 0;
+
+        std::cout << "New Game Started! Total Kills: 0" << std::endl;
+    }
+
 void UpdateCombatTimers(entt::registry &registry, float deltaTime)
 {
     for (auto entity : registry.view<AxeThrow>()) {
@@ -57,8 +68,11 @@ void TryMeleeAttack(entt::registry &registry, entt::entity attacker, entt::entit
         ActivateDamageFlash(registry, target);
     const char *source = registry.all_of<Player>(attacker) ? "Player" : "Enemy";
     const char *victim = registry.all_of<Player>(target) ? "Player" : "Enemy";
-    std::cout << source << " attacked " << victim << ": " << attack.damage << " damage\n"
-              << victim << " health: " << health.current << " / " << health.maximum << std::endl;
+    // Print the actual damage dealt after checking defense.
+    std::cout << source << " attacked " << victim << ": "
+        << finalDamage << " damage\n"
+        << victim << " health: " << health.current
+        << " / " << health.maximum << std::endl;
     HandleEntityDeath(registry);
 }
 
@@ -175,18 +189,113 @@ void UpdateThrownAxes(entt::registry &registry, float deltaTime)
     HandleEntityDeath(registry);
 }
 
-void HandleEntityDeath(entt::registry &registry)
+// Gives enemies a chance to drop a random potion when defeated.
+void DropRandomPotion(entt::registry& registry, const Transform& enemyTransform)
 {
-    for (auto victim : registry.view<Transform, Health>(entt::exclude<ToDestroy>)) {
-        auto &health = registry.get<Health>(victim);
-        if (health.current <= 0) {
-            if (registry.all_of<Enemy>(victim)) {
-                if (registry.get<Enemy>(victim).isBoss == true) {
+    // Set up our random number generator.
+    static std::random_device randomDevice;
+    static std::mt19937 generator(randomDevice());
+
+    // Roll a number between 1 and 100.
+    std::uniform_int_distribution<int> dropChance(1, 100);
+
+    // Only 30% of defeated enemies will drop a potion.
+    if (dropChance(generator) > 30)
+        return;
+
+    // Pick one of our three potion types.
+    std::uniform_int_distribution<int> potionType(1, 3);
+    int selectedPotion = potionType(generator);
+
+    // Spawn the potion where the enemy died.
+    auto potionTransform = enemyTransform;
+
+    // Choose which potion model and effect to use.
+    const char* modelName = nullptr;
+    BounsStatPickUpType pickupType = BounsStatPickUpType::HealthRestore;
+    float pickupValue = 0.0f;
+
+    switch (selectedPotion)
+    {
+    case 1:
+        // Red potion restores 25 HP.
+        modelName = "HealthPotion";
+        pickupType = BounsStatPickUpType::HealthRestore;
+        pickupValue = 25.0f;
+        break;
+
+    case 2:
+        // Green potion gives a temporary speed boost.
+        modelName = "SpeedPotion";
+        pickupType = BounsStatPickUpType::BonusSpeed;
+        pickupValue = 0.5f;
+        break;
+
+    case 3:
+        // Blue potion gives temporary damage reduction.
+        modelName = "DefensivePotion";
+        pickupType = BounsStatPickUpType::DefenseBoost;
+        pickupValue = 0.10f;
+        break;
+    }
+
+    // Create the potion model in the world.
+    const auto potion = CreateRenderable(
+        registry,
+        modelName,
+        potionTransform.matrix
+    );
+
+    // Give the potion its pickup effect.
+    registry.emplace<PickUp>(
+        potion,
+        PickUp{ pickupType, pickupValue }
+    );
+
+    // Print a message so we can confirm drops are working.
+    std::cout << "Enemy dropped a " << modelName << "!" << std::endl;
+}
+
+void HandleEntityDeath(entt::registry& registry)
+{
+    // Check every entity that has a transform and health.
+    for (auto victim : registry.view<Transform, Health>(entt::exclude<ToDestroy>))
+    {
+        auto& health = registry.get<Health>(victim);
+
+        // Only process entities that have died.
+        if (health.current <= 0)
+        {
+            // Check whether the defeated entity is an enemy.
+            if (registry.all_of<Enemy>(victim))
+            {
+                // Count this enemy as defeated.
+                totalEnemyKills++;
+
+                // Print our updated kill count.
+                std::cout << "Enemy defeated! Total Kills: "
+                    << totalEnemyKills << std::endl;
+
+                // Check if the defeated enemy was a boss.
+                if (registry.get<Enemy>(victim).isBoss)
+                {
+                    // Bosses still drop their dungeon keys.
                     DropDungeonKey(registry, registry.get<Transform>(victim));
+
+                    std::cout << "Boss defeated!" << std::endl;
                 }
+
+                // Every defeated enemy has a chance to drop a potion.
+                DropRandomPotion(registry, registry.get<Transform>(victim));
             }
+
+            // Keep the existing player death behavior.
             if (registry.all_of<Player>(victim))
+            {
                 ChangeScreen(Screens::GameOverMenu);
+            }
+
+            // Mark the defeated entity for cleanup.
             registry.emplace<ToDestroy>(victim);
         }
     }

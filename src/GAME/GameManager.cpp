@@ -188,6 +188,7 @@ entt::entity CreateRenderable(entt::registry &registry, const std::string &model
 
 void InitializeGameplay(entt::registry &registry)
 {
+    ResetEnemyKillCounter();
     const auto &settings = *registry.ctx().get<UTIL::Config>().gameConfig;
     const auto playerConfig = LoadCharacter(registry, "Player");
     const auto enemyConfig = LoadCharacter(registry, "Enemy");
@@ -205,64 +206,6 @@ void InitializeGameplay(entt::registry &registry)
     registry.emplace<WarriorAOE>(player);
     registry.emplace<AxeThrow>(player);
     AttachCharacter(registry, player, playerConfig);
-
-    // Testing the health pickup
-
-    // Spawn it a little to the right of the player
-    auto potionTransform = playerConfig.transform;
-    potionTransform.matrix.row4.x += 3.0f;
-
-    // Trying out the complete health potion model
-    const auto healthPotion = CreateRenderable(registry, "HealthPotion", potionTransform.matrix);
-
-    // Health pickup restores 25 HP
-    registry.emplace<PickUp>(healthPotion, PickUp{BounsStatPickUpType::HealthRestore, 25.0f});
-
-    // Lower player health for testing
-    auto &playerHealth = registry.get<Health>(player);
-    playerHealth.current = (std::max)(0.0f, playerHealth.maximum - 50.0f);
-
-    // Debug messages to check if everything works
-    std::cout << "TEST: Health potion spawned 3 units to the right!" << std::endl;
-
-    std::cout << "TEST: Player HP is " << playerHealth.current << "/" << playerHealth.maximum
-              << std::endl;
-
-    // Testing the speed boost potion
-
-    // Spawn another potion 7 units to the right of the player.
-    // This keeps it separate from our health potion.
-    auto speedPotionTransform = playerConfig.transform;
-    speedPotionTransform.matrix.row4.x += 7.0f;
-
-    // Use the health potion model temporarily.
-    const auto speedPotion = CreateRenderable(registry, "SpeedPotion", speedPotionTransform.matrix);
-
-    // Give this potion the temporary speed boost effect.
-    registry.emplace<PickUp>(speedPotion, PickUp{BounsStatPickUpType::BonusSpeed, 0.5f});
-
-    // Print a message so I know the potion spawned.
-    std::cout << "TEST: Speed potion spawned 7 units to the right!" << std::endl;
-
-    // Testing the defense potion
-
-// Spawn the defense potion 11 units to the right of the player.
-    auto defensePotionTransform = playerConfig.transform;
-    defensePotionTransform.matrix.row4.x += 11.0f;
-
-    // Spawn the blue defense potion model.
-    const auto defensePotion = CreateRenderable(
-        registry, "DefensivePotion", defensePotionTransform.matrix);
-
-    // Give this potion the temporary defense boost effect.
-    registry.emplace<PickUp>(
-        defensePotion,
-        PickUp{ BounsStatPickUpType::DefenseBoost, 0.10f }
-    );
-
-    // Print a message so I know the potion spawned.
-    std::cout << "TEST: Defense potion spawned 11 units to the right!"
-        << std::endl;
 
     CreateEnemy(registry, enemyConfig, enemyConfig.transform.matrix);
     CreateEnemy(registry, enemyConfig, enemyConfig.transform.matrix);
