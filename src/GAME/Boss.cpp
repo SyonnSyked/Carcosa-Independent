@@ -17,9 +17,30 @@ void TryVampiricDrain(entt::registry &registry, entt::entity target)
             GroundDistance(registry, queen, target) > attack.range)
             continue;
         attack.remaining = attack.cooldown;
-        auto &targetHealth = registry.get<Health>(target);
+        // Get the player's current health.
+        auto& targetHealth = registry.get<Health>(target);
         const float previousHealth = targetHealth.current;
-        targetHealth.current = (std::max)(0.0f, targetHealth.current - attack.damage);
+
+        // Start with the Vampire Queen's normal damage.
+        float finalDamage = attack.damage;
+
+        // Check whether the player has an active defense potion.
+        if (registry.all_of<DefenseBoost>(target))
+        {
+            const auto& defense = registry.get<DefenseBoost>(target);
+
+            // Reduce the Queen's damage while the potion is active.
+            if (defense.remaining > 0.0f)
+            {
+                finalDamage *= (1.0f - defense.damageReduction);
+            }
+        }
+
+        // Apply the reduced damage to the player.
+        targetHealth.current = (std::max)(0.0f, targetHealth.current - finalDamage);
+
+        // Calculate how much health the player actually lost.
+        // The Queen's healing will use this reduced damage too.
         const float damage = previousHealth - targetHealth.current;
         const float previousQueenHealth = health.current;
         health.current = static_cast<float>(

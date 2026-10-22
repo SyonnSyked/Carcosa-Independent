@@ -238,6 +238,22 @@ void UpdatePlayer(entt::registry &registry, float deltaTime)
             }
         }
 
+        // Count down the defense potion timer
+        if (registry.all_of<DefenseBoost>(entity))
+        {
+            auto& defense = registry.get<DefenseBoost>(entity);
+
+            defense.remaining -= deltaTime;
+
+            // Remove the defense boost when its 10 seconds are up
+            if (defense.remaining <= 0.0f)
+            {
+                registry.remove<DefenseBoost>(entity);
+
+                std::cout << "Defense potion expired!" << std::endl;
+            }
+        }
+
         // Pick against the camera and mesh transforms of the displayed frame, before movement.
         const auto target = pressed ? PickEnemy(registry) : entt::null;
         GVECTORF axeTarget;

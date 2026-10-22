@@ -30,6 +30,22 @@ void ApplyPickUp(entt::registry &registry, entt::entity player, const PickUp &pi
 
         break;
     }
+
+    case BounsStatPickUpType::DefenseBoost:
+    {
+        // Give the player a temporary defense boost.
+        auto& defense = registry.get_or_emplace<DefenseBoost>(player);
+
+        // Reduce incoming damage by 10% for 10 seconds.
+        defense.damageReduction = 0.10f;
+        defense.remaining = 10.0f;
+
+        // Picking up another potion resets the timer.
+        std::cout << "Defense Potion Collected! 10% Damage Reduction for 10 Seconds!"
+            << std::endl;
+
+        break;
+    }
     
     case BounsStatPickUpType::CDR:
         bonusStats.increaseCRD(pickup.Amount);
