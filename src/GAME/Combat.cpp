@@ -2,6 +2,8 @@
 #include "GameManager.h"
 #include "GameplaySystems.h"
 #include "../DRAW/DrawComponents.h"
+#include <random>
+#include <iostream>
 
 namespace GAME {
 
@@ -35,7 +37,22 @@ void TryMeleeAttack(entt::registry &registry, entt::entity attacker, entt::entit
     if (GroundDistance(registry, attacker, target) > attack.range)
         return;
     const float previousHealth = health.current;
-    health.current = (std::max)(0.0f, health.current - attack.damage);
+    // Start with the enemy's normal attack damage
+    float finalDamage = attack.damage;
+
+    // If the player has an active defense potion, reduce incoming damage
+    if (registry.all_of<Player, DefenseBoost>(target))
+    {
+        const auto& defense = registry.get<DefenseBoost>(target);
+
+        if (defense.remaining > 0.0f)
+        {
+            finalDamage *= (1.0f - defense.damageReduction);
+        }
+    }
+
+    // Apply the final damage after checking for defense
+    health.current = (std::max)(0.0f, health.current - finalDamage);
     if (health.current < previousHealth)
         ActivateDamageFlash(registry, target);
     const char *source = registry.all_of<Player>(attacker) ? "Player" : "Enemy";
