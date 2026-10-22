@@ -4,8 +4,10 @@
 #include "Collision.h"
 #include "GameplaySystems.h"
 #include "../UTIL/Utilities.h"
+#include "../DRAW/DrawComponents.h"
 
-namespace GAME{
+namespace GAME
+{
 
 
 void SpawnSquires(entt::registry &registry, float deltaTime)
@@ -110,38 +112,40 @@ void RingAttack(entt::registry &registry, float deltaTime)
             
             if (attack.Remaining <= 0.0f) {
                 attack.state = RingState::TeleGraph;
-                attack.WaitTime = 1.5f; // 1.5 seconds of warning
+              
                 
-                // SPAWN THE VISUALS
+           
                 const auto center = registry.get<Transform>(Knight).matrix.row4;
                 const float heightOffset = registry.ctx().get<UTIL::Config>().gameConfig->RequireFloat("WizardWarning", "heightOffset");
                 
                 for (int i = 0; i < 3; ++i) {
                     const auto& ringData = attack.Rings[i];
                     
-                    // Use the outer radius to scale the model
-                    auto transform = registry.get<DRAW::GPUInstance>(registry.ctx().get<DRAW::ModelManager>().models.at("PurpleSpellEffect").meshEntities.at(0)).transform;
-                    const float scale = ringData.Outter / 1.25f;
+                  
+                    auto transform = registry.get<DRAW::GPUInstance>(registry.ctx().get<DRAW::ModelManager>().models.at("KnightRing").meshEntities.at(0)).transform;
+                    const float scale = ringData.Outter * 2;
                     
                     transform.row1.x *= scale; transform.row1.y *= scale; transform.row1.z *= scale;
                     transform.row2.x *= scale; transform.row2.y *= scale; transform.row2.z *= scale;
                     transform.row4 = {center.x, center.y + heightOffset, center.z, 1};
                     
-                    // Spawn it and save the entity ID into the array
-                    entt::entity visual = CreateRenderable(registry, "PurpleSpellEffect", transform);
+                
+                    entt::entity visual = CreateRenderable(registry, "KnightRing", transform);
                     attack.Visuals[i] = visual;
                 }
             }
         }
         
-        // 2. Telegraphing (Waiting for the boom)
+        
         else if (attack.state == RingState::TeleGraph)
         {
+            
             attack.WaitTime -= deltaTime;
             
-            if (attack.WaitTime <= 0.0f)
+
+            if (wait <= 0.0f)
             {
-                // BOOM! Do the damage check exactly once.
+             
                 for (auto Player : Players)
                 {
                     float Distance = GroundDistance(registry, Knight, Player);
@@ -163,15 +167,15 @@ void RingAttack(entt::registry &registry, float deltaTime)
                     }
                 }
                 
-                // DESTROY THE VISUALS
+             
                 for (int i = 0; i < 3; ++i) {
                     if (attack.Visuals[i] != entt::null && registry.valid(attack.Visuals[i])) {
                         registry.destroy(attack.Visuals[i]);
-                        attack.Visuals[i] = entt::null; // clean up the handle
+                        attack.Visuals[i] = entt::null; 
                     }
                 }
                 
-                // Reset back to Idle
+           
                 attack.state = RingState::Idle;
                 attack.Remaining = attack.CoolDown;
             }
@@ -182,7 +186,6 @@ void RingAttack(entt::registry &registry, float deltaTime)
 void UpdateKnight(entt::registry &registry, float deltaTime)
 {
 
-    RingState state = 
 
     if (!std::isfinite(deltaTime) || deltaTime < 0)
         return;

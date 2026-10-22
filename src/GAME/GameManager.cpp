@@ -382,6 +382,13 @@ void UpdateGameSystems(entt::registry &registry)
         DestroyPendingEntities(registry);
         return;
     }
+    UpdateKnight(registry,deltaTime);
+    if (CurrentState.ActiveScreen != Screens::Playing) {
+        DestroyPendingEntities(registry);
+        return;
+    }
+    
+    
     // Combat deaths free population slots now; new enemies begin AI next frame.
     // Spawn before mesh synchronization so new instances render at their placement immediately.
     UpdateHordeSpawner(registry, deltaTime);
@@ -871,6 +878,52 @@ float GroundDistance(entt::registry &registry, entt::entity a, entt::entity b)
     const auto &q = registry.get<Transform>(b).matrix.row4;
     const float x = q.x - p.x, z = q.z - p.z;
     return std::sqrt(x * x + z * z);
+}
+
+
+void LoadLevel(entt::registry& registry, const std::string& levelKey)
+{
+    entt::entity display = entt::null;
+    auto saveState = registry.ctx().get<DungeonState>();
+
+    for(auto entity : registry.view<DRAW::VulkanRenderer>())
+    {
+        display = entity;
+        break;
+    }
+
+
+    std::vector<entt::entity> entities;
+
+    for(auto check : registry.view<entt::entity>())
+    {
+        entities.push_back(check);
+    }
+
+    for(auto check : entities)
+    {
+        if(check != display)
+        registry.destroy(check);
+    }
+
+
+    registry.ctx().erase<DRAW::ModelManager>();
+    registry.ctx().erase<DRAW::CPULevel>();
+    registry.ctx().erase<DRAW::GPULevel>();
+    registry.ctx().erase<CharacterConfig>();
+
+    const auto& settings = *registry.ctx().get<UTIL::Config>().gameConfig;
+    std::string LevelPath = settings.at("Content").at(levelKey).as<std::string>(); 
+
+    registry.emplace<DRAW::CPULevel>(display,DRAW::CPULevel{LevelPath,settings.at("Content").at("models").as<std::string>(),{}});
+    registry.ctx().emplace<DungeonState>(saveState);
+
+    registry.emplace<DRAW::GPULevel>(display);
+
+    GAME::InitializeGameplay(registry);
+
+    ChangeScreen(Screens::Playing);
+
 }
 
 } // namespace GAME
