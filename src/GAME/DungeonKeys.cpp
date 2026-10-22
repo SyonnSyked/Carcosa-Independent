@@ -88,11 +88,30 @@ void UseDungeonKey(entt::registry &registry)
     const auto &key = registry.get<DungeonKey>(player);
     if (key.level != state.level || GroundDistance(registry, door, player) > key.distToUse)
         return;
+
+
+
+
     registry.remove<DungeonKey>(player);
-    // Completion freezes gameplay while the win screen offers the next action.
-    state.complete = true;
+
+        if(state.level == 1)
+        {
+            state.level = 2;
+            std::cout << "Level 1 completed moving to level 2";
+            LoadLevel(registry, "level2");
+
+        }
+else{
+
+      state.complete = true;
     ChangeScreen(Screens::WinMenu);
     std::cout << "Dungeon " << state.level << " COMPLETE: key consumed, win screen opened."
               << std::endl;
+}
+
+
+
+    // Completion freezes gameplay while the win screen offers the next action.
+  
 }
 } // namespace GAME

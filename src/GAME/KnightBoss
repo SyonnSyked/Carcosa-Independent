@@ -1,0 +1,230 @@
+#include "GameComponents.h"
+#include "GameManager.h"
+#include "../DRAW/DrawComponents.h"
+#include "Collision.h"
+#include "GameplaySystems.h"
+#include "../UTIL/Utilities.h"
+#include "../DRAW/DrawComponents.h"
+
+namespace GAME
+{
+
+
+void SpawnSquires(entt::registry &registry, float deltaTime)
+{
+        
+        auto& Knights = registry.view<UndeadKnight,Enemy,Transform,Movement,MeleeAttack,SpawnSquiresAttack,Health>();
+        //need to stop his movement and spawn four squires around him
+       for(auto Knight : Knights)
+       {
+            auto& attack = registry.get<SpawnSquiresAttack>(Knight);   
+            auto& KnightLocation = registry.get<Transform>(Knight);
+            auto& KnightHp = registry.get<Health>(Knight);
+            const double SquireRadius = registry.ctx().get<CollisionConfig>();
+
+
+                if(attack.Remaining > 0){
+                attack.Remaining-=deltaTime;
+                continue;
+            }
+
+                float Additional = KnightHp.current / KnightHp.maximum;
+
+                int Total = attack.SquireMin + static_cast<int>((1.0f-Additional)*attack.SquireMax);
+                
+                const float radius = attack.Radius;
+                const float KnightX = KnightLocation.matrix.row4.x;
+                const float KnightY = KnightLocation.matrix.row4.y;
+                const float KnightZ = KnightLocation.matrix.row4.z;            
+                              
+                std::vector<Footprint> obstacles;
+                for(auto& obstacle : registry.view<Collidable,Obstacle,Transform,DRAW::MeshCollection>(entt::exclude<ToDestroy>))
+                {
+                    obstacles.push_back(WorldFootprint(registry.get<DRAW::MeshCollection>(obstacle),registry.get<Transform>(obstacle)));
+                }
+
+               
+                for(int i =0; i < Total; i++)
+                {
+                    float squireAngle = (2*3.14*i)/Total;
+                    float SpawnX = KnightX + std::cos(squireAngle) * radius;
+                   
+                    float SpawnZ = KnightZ + std::sin(squireAngle) * radius;
+
+                    Point Spawn{SpawnX,SpawnZ};                   
+
+                     bool Empty = true;
+                     for(int i = 0; i < contactPasses; i++)
+                     {
+                     for(auto& Clutter : obstacles)
+                     {
+                        const auto correction = PushOut(Clutter, Spawn, 1);
+                         if (Dot2(correction, correction) > 0) // spot is take up by a wall / obstacle
+                         {
+                           Empty = false;
+                           break;
+                         };
+
+                        
+                     }
+                     if(!Empty)
+                     continue;
+
+                     GW::MATH::GMATRIXF SpawnMat = KnightLocation.matrix;
+                     SpawnMat.row4.x =SpawnX;
+                     SpawnMat.row4.y = KnightY;
+                     SpawnMat.row4.z = SpawnZ;
+                     const auto squireConfig = LoadCharacter(registry, "Squire");
+                     CreateEnemyVariant(registry, squireConfig, SpawnMat, EnemyVariant::Squire);
+
+
+                }
+                       
+            
+             }
+                attack.Remaining = attack.CoolDown;                 
+
+            }
+       
+        
+
+
+        return; // This encounter has one active Queen.
+    
+}
+
+
+void RingAttack(entt::registry &registry, float deltaTime)
+{
+    auto Knights = registry.view<UndeadKnight, Enemy, Transform, RingAttackStats, Health>();
+    auto Players = registry.view<Player, Transform, Health>();
+
+    for (auto Knight : Knights)
+    {
+        auto& attack = registry.get<RingAttackStats>(Knight);
+        
+        // 1. Tick the Cooldown (Idle State)
+        if (attack.state == RingState::Idle)
+        {
+            if (attack.Remaining > 0.0f) {
+                attack.Remaining -= deltaTime;
+            }
+            
+            if (attack.Remaining <= 0.0f) {
+                attack.state = RingState::TeleGraph;
+              
+                
+           
+                const auto center = registry.get<Transform>(Knight).matrix.row4;
+                const float heightOffset = registry.ctx().get<UTIL::Config>().gameConfig->RequireFloat("WizardWarning", "heightOffset");
+                
+                for (int i = 0; i < 3; ++i) {
+                    const auto& ringData = attack.Rings[i];
+                    
+                  
+                    auto transform = registry.get<DRAW::GPUInstance>(registry.ctx().get<DRAW::ModelManager>().models.at("KnightRing").meshEntities.at(0)).transform;
+                    const float scale = ringData.Outter * 2;
+                    
+                    transform.row1.x *= scale; transform.row1.y *= scale; transform.row1.z *= scale;
+                    transform.row2.x *= scale; transform.row2.y *= scale; transform.row2.z *= scale;
+                    transform.row4 = {center.x, center.y + heightOffset, center.z, 1};
+                    
+                
+                    entt::entity visual = CreateRenderable(registry, "KnightRing", transform);
+                    attack.Visuals[i] = visual;
+                }
+            }
+        }
+        
+        
+        else if (attack.state == RingState::TeleGraph)
+        {
+            
+            attack.WaitTime -= deltaTime;
+            
+
+            if (wait <= 0.0f)
+            {
+             
+                for (auto Player : Players)
+                {
+                    float Distance = GroundDistance(registry, Knight, Player);
+                    bool hit = false;
+                    
+                    for (const auto& ring : attack.Rings)
+                    {
+                        if (Distance >= ring.Inner && Distance <= ring.Outter)
+                        {
+                            hit = true;
+                            break; 
+                        }
+                    }
+
+                    if (hit)
+                    {
+                        auto& PlayerHealth = registry.get<Health>(Player);
+                        PlayerHealth.current -= attack.Damage;
+                    }
+                }
+                
+             
+                for (int i = 0; i < 3; ++i) {
+                    if (attack.Visuals[i] != entt::null && registry.valid(attack.Visuals[i])) {
+                        registry.destroy(attack.Visuals[i]);
+                        attack.Visuals[i] = entt::null; 
+                    }
+                }
+                
+           
+                attack.state = RingState::Idle;
+                attack.Remaining = attack.CoolDown;
+            }
+        }
+    }
+}
+
+void UpdateKnight(entt::registry &registry, float deltaTime)
+{
+
+
+    if (!std::isfinite(deltaTime) || deltaTime < 0)
+        return;
+    entt::entity player = entt::null;
+    for (auto candidate : registry.view<Player, Transform, Health>(entt::exclude<ToDestroy>)) {
+        if (registry.get<Health>(candidate).current > 0) {
+            player = candidate;
+            break;
+        }
+    }
+    if (player == entt::null)
+        return;
+    for (auto Knight : registry.view<UndeadKnight, Enemy, Transform, Movement, MeleeAttack,
+                                    SpawnSquiresAttack, Health>(entt::exclude<ToDestroy>)) {
+        if (registry.get<Health>(Knight).current <= 0 || registry.any_of<ToDestroy>(player) ||
+            registry.get<Health>(player).current <= 0)
+            continue;
+        const float distance = GroundDistance(registry, Knight, player);
+        const auto &SquireSpawn = registry.get<SpawnSquiresAttack>(Knight);
+        const float range = registry.get<MeleeAttack>(Knight).range;
+
+        if (SquireSpawn.Remaining <= 0) {
+            SpawnSquires(registry,deltaTime);
+        } 
+        else if (distance <= range) {
+
+            TryMeleeAttack(registry, Knight, player);
+      
+        } 
+        else {
+
+            const auto &target = registry.get<Transform>(player).matrix.row4;
+            auto &position = registry.get<Transform>(Knight).matrix.row4;
+            const float step =
+                (std::min)(registry.get<Movement>(Knight).speed * deltaTime, distance - range);
+            position.x += (target.x - position.x) / distance * step;
+            position.z += (target.z - position.z) / distance * step;
+
+        }
+    }
+}
+} // namespace GAME

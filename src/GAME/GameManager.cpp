@@ -69,6 +69,59 @@ VampiricDrainAttack LoadVampiricDrain(const GameConfig &settings)
         throw std::runtime_error("Invalid VampireQueen drain tuning: values must be nonnegative");
     return drain; // RequireFloat already rejects nonfinite values.
 }
+     
+SpawnSquiresAttack LoadSquireSpawn(const GameConfig &settings)
+{
+    
+    SpawnSquiresAttack spawn;
+    spawn.SquireMin = settings.RequireFloat("UndeadKnight", "squireMin");
+    spawn.SquireMax = settings.RequireFloat("UndeadKnight", "squireMax");
+    spawn.CoolDown =  settings.RequireFloat("UndeadKnight", "summonCD");
+    spawn.Radius = settings.RequireFloat("UndeadKnight", "spawnRadius");
+    
+    if(spawn.SquireMin < 0 || spawn.SquireMax < 0 || spawn.CoolDown < 0 || spawn.Radius < 0)
+        throw std::runtime_error("Knight has improper values");
+    return spawn;      
+}
+
+RingAttackStats LoadKnightRingAttack(const GameConfig &settings)
+{
+    RingAttackStats Ring;
+
+    Ring.CoolDown = settings.RequireFloat("UndeadKnight","CoolDown");
+    Ring.Damage = settings.RequireFloat("UndeadKnight", "ringDamage");
+    Ring.WaitTime = settings.RequireFloat("UndeadKnight", "WaitTime");
+
+    Ring.Rings[0] = ReturnRingRadius(settings,"UndeadKnight", "ring1");
+    Ring.Rings[1] = ReturnRingRadius(settings, "UndeadKnight", "ring2");
+    Ring.Rings[3] = ReturnRingRadius(settings, "UndeadKnight", "ring3");
+
+    Ring.state = RingState::Idle;
+    Ring.CoolDown = 0;
+
+    return Ring;
+
+}
+
+Ring ReturnRingRadius(const GameConfig& settings, const std::string& section, const std::string& key)
+{
+    std::string raw = settings.at(section).at(key).as<std::string>();
+
+    for(char& c : raw)
+        {
+            if (c == ',') 
+                c = ' ';
+        }
+
+
+    std::stringstream ss(raw);
+    Ring ring;
+
+    ss >> ring.Inner >> ring.Outter;
+
+    return ring;
+}
+
 
 HordeSpawner LoadHordeSpawner(const GameConfig &settings)
 {
@@ -192,6 +245,7 @@ void InitializeGameplay(entt::registry &registry)
     const auto &settings = *registry.ctx().get<UTIL::Config>().gameConfig;
     const auto playerConfig = LoadCharacter(registry, "Player");
     const auto enemyConfig = LoadCharacter(registry, "Enemy");
+   
     const auto spawner = LoadHordeSpawner(settings);
     InitializeGameplaySettings(registry, settings);
     InitializeDungeonKeys(registry);
@@ -218,6 +272,7 @@ void InitializeGameplay(entt::registry &registry)
     wizardPlacement.row4.x -= 5.0f;
     wizardPlacement.row4.z += 3.0f;
     CreateEnemyVariant(registry, enemyConfig, wizardPlacement, EnemyVariant::Wizard);
+
     const auto drainConfig = LoadVampiricDrain(settings);
     const auto queenModel = settings.at("VampireQueen").at("model").as<std::string>();
     const auto *models = registry.ctx().find<DRAW::ModelManager>();
@@ -230,6 +285,30 @@ void InitializeGameplay(entt::registry &registry)
                   << " in the selected level (export its H2B and object with gameType != none)."
                   << std::endl;
     }
+
+    const auto KnightSpawnConfig = LoadSquireSpawn(settings);
+    const auto KnightRingAttack = LoadKnightRingAttack(settings);
+    const auto KnightModel = settings.at("UndeadKnight").at("model").as<std::string>();
+    const auto *models = registry.ctx().find<DRAW::ModelManager>();
+    if(models && models->models.contains(KnightModel) &&
+
+        !models->models.at(KnightModel).meshEntities.empty())
+        {
+            const auto KnightConfig = LoadCharacter(registry,"UndeadKnight");
+            CreatUndeadKnight(registry,KnightConfig,KnightSpawnConfig,KnightConfig.transform.matrix);                
+
+        }
+
+        else{
+
+            std::cout << "Undead Knight not spawned: missing dynamic Blender template " << KnightModel
+                     << " in the selected level (export its H2B and object with gameType != none)."
+                    << std::endl;
+
+        }
+
+
+
     const auto spawnerEntity = registry.create();
     registry.emplace<HordeSpawner>(spawnerEntity, spawner);
     registry.emplace<Transform>(spawnerEntity, enemyConfig.transform);
@@ -310,6 +389,13 @@ void UpdateGameSystems(entt::registry &registry)
         DestroyPendingEntities(registry);
         return;
     }
+    UpdateKnight(registry,deltaTime);
+    if (CurrentState.ActiveScreen != Screens::Playing) {
+        DestroyPendingEntities(registry);
+        return;
+    }
+    
+    
     // Combat deaths free population slots now; new enemies begin AI next frame.
     // Spawn before mesh synchronization so new instances render at their placement immediately.
     UpdateHordeSpawner(registry, deltaTime);
@@ -890,12 +976,86 @@ entt::entity CreateVampireQueen(entt::registry &registry, const CharacterConfig 
     return queen;
 }
 
+entt::entity CreatUndeadKnight(entt::registry &registry,const CharacterConfig &config,
+                                    const SpawnSquiresAttack &special,
+                                    const RingAttackStats &special2,
+                                    const GW::MATH::GMATRIXF &placement)
+{
+    const auto Knight = CreateRenderable(registry,config.model,placement);
+
+  try
+  {
+    registry.emplace<Enemy>(Knight,Enemy{true,0});
+    registry.emplace<UndeadKnight>(Knight);
+    AttachCharacter(registry,Knight,config);
+    auto SpawnSquires = special;
+    auto RingAttack = special2;
+    SpawnSquires.Remaining = 0;
+    RingAttack.Remaining = 0;
+    registry.emplace<SpawnSquiresAttack>(Knight,SpawnSquires);
+    registry.emplace<RingAttackStats>(Knight,RingAttack);
+  }
+
+  catch(...) 
+  {
+    registry.destroy(Knight);
+    throw;
+  }
+  return Knight;
+}
+
 float GroundDistance(entt::registry &registry, entt::entity a, entt::entity b)
 {
     const auto &p = registry.get<Transform>(a).matrix.row4;
     const auto &q = registry.get<Transform>(b).matrix.row4;
     const float x = q.x - p.x, z = q.z - p.z;
     return std::sqrt(x * x + z * z);
+}
+
+
+void LoadLevel(entt::registry& registry, const std::string& levelKey)
+{
+    entt::entity display = entt::null;
+    auto saveState = registry.ctx().get<DungeonState>();
+
+    for(auto entity : registry.view<DRAW::VulkanRenderer>())
+    {
+        display = entity;
+        break;
+    }
+
+
+    std::vector<entt::entity> entities;
+
+    for(auto check : registry.view<entt::entity>())
+    {
+        entities.push_back(check);
+    }
+
+    for(auto check : entities)
+    {
+        if(check != display)
+        registry.destroy(check);
+    }
+
+
+    registry.ctx().erase<DRAW::ModelManager>();
+    registry.ctx().erase<DRAW::CPULevel>();
+    registry.ctx().erase<DRAW::GPULevel>();
+    registry.ctx().erase<CharacterConfig>();
+
+    const auto& settings = *registry.ctx().get<UTIL::Config>().gameConfig;
+    std::string LevelPath = settings.at("Content").at(levelKey).as<std::string>(); 
+
+    registry.emplace<DRAW::CPULevel>(display,DRAW::CPULevel{LevelPath,settings.at("Content").at("models").as<std::string>(),{}});
+    registry.ctx().emplace<DungeonState>(saveState);
+
+    registry.emplace<DRAW::GPULevel>(display);
+
+    GAME::InitializeGameplay(registry);
+
+    ChangeScreen(Screens::Playing);
+
 }
 
 } // namespace GAME

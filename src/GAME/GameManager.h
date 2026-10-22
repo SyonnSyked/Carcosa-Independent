@@ -38,6 +38,7 @@ entt::entity CreateVampireQueen(entt::registry &registry, const CharacterConfig 
 void InitializeGameplay(entt::registry &registry);
 void RestartGame(entt::registry &registry);
 void UpdateGameSystems(entt::registry &registry);
+void LoadLevel(entt::registry& registry, const std::string& newLevelPath);
 // Clone a loaded dynamic template by its exact Blender object name.
 // Throws for an unavailable model. The returned entity owns its mesh instances.
 entt::entity CreateRenderable(entt::registry &registry, const std::string &modelName,
