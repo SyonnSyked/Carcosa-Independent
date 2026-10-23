@@ -288,7 +288,7 @@ void InitializeGameplay(entt::registry &registry)
                   << std::endl;
     }
 
-    const auto KnightSpawnConfig = LoadSquireSpawn(settings);
+    const auto KnightSpawnConfig = LoadSquireSpawn(settings);    
     const auto KnightRingAttack = LoadKnightRingAttack(settings);
     const auto KnightModel = settings.at("UndeadKnight").at("model").as<std::string>();
     
@@ -297,7 +297,7 @@ void InitializeGameplay(entt::registry &registry)
         !models->models.at(KnightModel).meshEntities.empty())
         {
             const auto KnightConfig = LoadCharacter(registry,"UndeadKnight");
-            CreateUndeadKnight(registry,KnightConfig,KnightSpawnConfig,KnightConfig.transform.matrix);                
+            CreateUndeadKnight(registry,KnightConfig,KnightSpawnConfig,KnightRingAttack,KnightConfig.transform.matrix);                
 
         }
 

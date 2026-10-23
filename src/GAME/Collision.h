@@ -5,7 +5,7 @@
 #include <limits>
 
 namespace GAME {
-namespace {
+
 struct Point {
     double x, z;
     Point operator+(Point b) const { return {x + b.x, z + b.z}; }
