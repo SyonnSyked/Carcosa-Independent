@@ -245,7 +245,8 @@ entt::entity CreateRenderable(entt::registry &registry, const std::string &model
 }
 
 void InitializeGameplay(entt::registry &registry)
-{
+{   
+    if(!registry.ctx().find<DungeonState>())
     registry.ctx().emplace<DungeonState>(DungeonState{1, false});
 
 
