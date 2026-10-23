@@ -359,7 +359,6 @@ void RestartGame(entt::registry &registry)
     for (auto entity : gameplayEntities)
         if (registry.valid(entity))
             registry.destroy(entity); // MeshCollection owns each actor's visible meshes.
-    registry.ctx().erase<DungeonState>();
     CurrentState.playerScore = 0;
     // Restart the current dungeon, including after Level 2 completion.
     registry.ctx().get<DungeonState>() = DungeonState{registry.ctx().get<DungeonState>().level};
