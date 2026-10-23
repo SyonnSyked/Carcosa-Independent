@@ -12,18 +12,6 @@ GameState CurrentState;
 ImGuiStyle buttonStyle;
 ButtonDim buttonDiemension;
 
-namespace {
-void AttachCharacter(entt::registry &registry, entt::entity entity, const CharacterConfig &config)
-{
-    registry.emplace<Health>(entity, Health{config.health, config.health});
-    registry.emplace<Movement>(entity, Movement{config.speed});
-    auto attack = config.attackData;
-    attack.remaining = 0;
-    registry.emplace<MeleeAttack>(entity, attack);
-    //    auto abilities = config.characterClass;
-    //   registry.emplace<Abilities>(entity, abilities);
-}
-
 CharacterConfig LoadCharacter(entt::registry &registry, const char *role)
 {
     const auto &settings = *registry.ctx().get<UTIL::Config>().gameConfig;
@@ -58,6 +46,21 @@ CharacterConfig LoadCharacter(entt::registry &registry, const char *role)
     }
     throw std::runtime_error("Gameplay object not loaded: " + config.model);
 }
+
+
+namespace {
+void AttachCharacter(entt::registry &registry, entt::entity entity, const CharacterConfig &config)
+{
+    registry.emplace<Health>(entity, Health{config.health, config.health});
+    registry.emplace<Movement>(entity, Movement{config.speed});
+    auto attack = config.attackData;
+    attack.remaining = 0;
+    registry.emplace<MeleeAttack>(entity, attack);
+    //    auto abilities = config.characterClass;
+    //   registry.emplace<Abilities>(entity, abilities);
+}
+
+
 
 VampiricDrainAttack LoadVampiricDrain(const GameConfig &settings)
 {
@@ -108,9 +111,9 @@ RingAttackStats LoadKnightRingAttack(const GameConfig &settings)
 {
     RingAttackStats Ring;
 
-    Ring.CoolDown = settings.RequireFloat("UndeadKnight","CoolDown");
+    Ring.CoolDown = settings.RequireFloat("UndeadKnight","ringCooldown");
     Ring.Damage = settings.RequireFloat("UndeadKnight", "ringDamage");
-    Ring.WaitTime = settings.RequireFloat("UndeadKnight", "WaitTime");
+    Ring.WaitTime = settings.RequireFloat("UndeadKnight", "ringWaitTime");
 
     Ring.Rings[0] = ReturnRingRadius(settings,"UndeadKnight", "ring1");
     Ring.Rings[1] = ReturnRingRadius(settings, "UndeadKnight", "ring2");
@@ -243,6 +246,9 @@ entt::entity CreateRenderable(entt::registry &registry, const std::string &model
 
 void InitializeGameplay(entt::registry &registry)
 {
+    registry.ctx().emplace<DungeonState>(DungeonState{1, false});
+
+
     ResetEnemyKillCounter();
     const auto &settings = *registry.ctx().get<UTIL::Config>().gameConfig;
     const auto playerConfig = LoadCharacter(registry, "Player");
@@ -1018,8 +1024,9 @@ float GroundDistance(entt::registry &registry, entt::entity a, entt::entity b)
 void LoadLevel(entt::registry& registry, const std::string& levelKey)
 {
     entt::entity display = entt::null;
-    auto saveState = registry.ctx().get<DungeonState>();
+    auto* saveStatePtr = registry.ctx().find<DungeonState>();
 
+    DungeonState saveState = saveStatePtr ? *saveStatePtr : DungeonState{1, false};
     for(auto entity : registry.view<DRAW::VulkanRenderer>())
     {
         display = entity;
