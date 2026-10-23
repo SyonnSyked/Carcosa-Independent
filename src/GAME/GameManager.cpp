@@ -84,6 +84,26 @@ SpawnSquiresAttack LoadSquireSpawn(const GameConfig &settings)
     return spawn;      
 }
 
+Ring ReturnRingRadius(const GameConfig& settings, const std::string& section, const std::string& key)
+{
+    std::string raw = settings.at(section).at(key).as<std::string>();
+
+    for(char& c : raw)
+        {
+            if (c == ',') 
+                c = ' ';
+        }
+
+
+    std::stringstream ss(raw);
+    Ring ring;
+
+    ss >> ring.Inner >> ring.Outter;
+
+    return ring;
+}
+
+
 RingAttackStats LoadKnightRingAttack(const GameConfig &settings)
 {
     RingAttackStats Ring;
@@ -103,24 +123,6 @@ RingAttackStats LoadKnightRingAttack(const GameConfig &settings)
 
 }
 
-Ring ReturnRingRadius(const GameConfig& settings, const std::string& section, const std::string& key)
-{
-    std::string raw = settings.at(section).at(key).as<std::string>();
-
-    for(char& c : raw)
-        {
-            if (c == ',') 
-                c = ' ';
-        }
-
-
-    std::stringstream ss(raw);
-    Ring ring;
-
-    ss >> ring.Inner >> ring.Outter;
-
-    return ring;
-}
 
 
 HordeSpawner LoadHordeSpawner(const GameConfig &settings)
@@ -976,7 +978,7 @@ entt::entity CreateVampireQueen(entt::registry &registry, const CharacterConfig 
     return queen;
 }
 
-entt::entity CreatUndeadKnight(entt::registry &registry,const CharacterConfig &config,
+entt::entity CreateUndeadKnight(entt::registry &registry,const CharacterConfig &config,
                                     const SpawnSquiresAttack &special,
                                     const RingAttackStats &special2,
                                     const GW::MATH::GMATRIXF &placement)
