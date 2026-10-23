@@ -1,6 +1,8 @@
 #pragma once
 #include "GameComponents.h"
 #include <entt/entt.hpp>
+
+
 namespace GAME {
 void InitializeDamageFeedback(entt::registry &registry);
 void ActivateDamageFlash(entt::registry &registry, entt::entity entity);
@@ -11,6 +13,7 @@ void UpdateEnemy(entt::registry &registry, float deltaTime);
 void UpdateProjectiles(entt::registry &registry, float deltaTime);
 void UpdateSpellAreas(entt::registry &registry, float deltaTime);
 void UpdateVampireQueen(entt::registry &registry, float deltaTime);
+void UpdateKnight(entt::registry &registry, float deltaTime);
 void UpdateCamera(entt::registry &registry);
 void UpdateHordeSpawner(entt::registry &registry, float deltaTime);
 void TryWarriorAOE(entt::registry &registry, entt::entity player);
@@ -20,6 +23,8 @@ void UpdateThrownAxes(entt::registry &registry, float deltaTime);
 void UpdateCombatTimers(entt::registry &registry, float deltaTime);
 void TryMeleeAttack(entt::registry &registry, entt::entity attacker, entt::entity target);
 void HandleEntityDeath(entt::registry &registry);
+// Resets the enemy kill counter whenever a new game starts.
+void ResetEnemyKillCounter();
 void ApplyPickUp(entt::registry &registry, entt::entity player, const PickUp &pickup);
 void PickUpObject(entt::registry &registry, entt::entity player,
                   const GW::MATH::GVECTORF &playerPosition, float playerRadius);

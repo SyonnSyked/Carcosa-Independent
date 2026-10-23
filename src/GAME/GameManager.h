@@ -30,6 +30,7 @@ void DrawWinScreen(entt::registry &registry);
 void RenderScreens(entt::registry &registry);
 void DrawBlackWindow();
 void ButtonStyleSetup();
+CharacterConfig LoadCharacter(entt::registry &registry, const char *role);
 
 void DrawHighScore(entt::registry &registry);
 void AddToPlayerScore(unsigned int points);
@@ -37,11 +38,16 @@ void AddToPlayerScore(unsigned int points);
 struct CharacterConfig;
 struct VampiricDrainAttack;
 entt::entity CreateVampireQueen(entt::registry &registry, const CharacterConfig &config,
-                                const VampiricDrainAttack &drain,
-                                const GW::MATH::GMATRIXF &placement);
+                               const VampiricDrainAttack &drain,
+                               const GW::MATH::GMATRIXF &placement);
+entt::entity CreateUndeadKnight(entt::registry &registry,const CharacterConfig &config,
+                                    const SpawnSquiresAttack &special,
+                                    const RingAttackStats &special2,
+                                    const GW::MATH::GMATRIXF &placement);
 void InitializeGameplay(entt::registry &registry);
 void RestartGame(entt::registry &registry);
 void UpdateGameSystems(entt::registry &registry);
+void ProcessLevelTransition(entt::registry &registry);
 // Clone a loaded dynamic template by its exact Blender object name.
 // Throws for an unavailable model. The returned entity owns its mesh instances.
 entt::entity CreateRenderable(entt::registry &registry, const std::string &modelName,

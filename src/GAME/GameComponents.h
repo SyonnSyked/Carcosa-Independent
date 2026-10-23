@@ -49,7 +49,8 @@ struct Enemy {
     unsigned int scorePoints = 100;
 };
 
-enum class EnemyVariant { Melee, Ranged, Wizard };
+enum class EnemyVariant { Melee, Ranged, Wizard, Squire};
+
 
 struct WizardAttack {
     float damage = 15.0f;
@@ -89,6 +90,13 @@ struct Movement {
 struct SpeedBoost {
     float multiplier = 1.5f; // Player moves 50% faster.
     float remaining = 10.0f; // Boost lasts for 10 seconds.
+};
+
+// Temporary defense boost from the orange potion
+struct DefenseBoost
+{
+    float damageReduction = 0.10f; // Reduce incoming damage by 10%
+    float remaining = 10.0f;       // Effect lasts 10 seconds
 };
 struct MeleeAttack {
     float damage, range, cooldown;
@@ -149,8 +157,48 @@ struct BonusStats {
     }
 };
 
-struct VampireQueen {};
+//UndeadKnight stuff
+struct UndeadKnight {};
 
+struct SpawnSquiresAttack 
+{             
+        int SquireMin;
+        int SquireMax;
+        float CoolDown;
+        float Remaining = 0;
+        float Radius;
+};
+
+struct Ring{
+    float Inner;
+    float Outter;
+};
+
+enum class RingState
+{
+    Idle,
+    TeleGraph,
+    Done
+};
+
+struct RingAttackStats
+{
+   
+    Ring Rings[3];
+    RingState state;
+    float Damage;
+    float CoolDown;
+    float Remaining;
+    float WaitTime; // before the damage happens
+
+
+    entt::entity Visuals[3] = {entt::null,entt::null,entt::null};
+
+};
+
+
+//VampireQueen stuff
+struct VampireQueen {};
 struct VampiricDrainAttack {
     float damage, lifeSteal, range;
     float cooldown;
@@ -164,7 +212,9 @@ enum class BounsStatPickUpType {
     CDR,
     CritChance,
     AttackSpeed,
-    HealthRestore
+    HealthRestore,
+    DefenseBoost,	
+	IncreaseMaxHp,
 };
 
 struct DungeonKey {
@@ -183,6 +233,8 @@ struct DungeonKeyConfig {
 struct DungeonState {
     int level;
     bool complete = false;
+    bool transitionPending = false;
+    bool transitionFailed = false;
 };
 
 struct PickUp {

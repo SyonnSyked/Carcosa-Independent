@@ -7,23 +7,14 @@
 #include <cstdio>
 #include <limits>
 #include <sstream>
+#include <fstream>
+#include <optional>
+#include <tuple>
 
 namespace GAME {
 GameState CurrentState;
 ImGuiStyle buttonStyle;
 ButtonDim buttonDiemension;
-
-namespace {
-void AttachCharacter(entt::registry &registry, entt::entity entity, const CharacterConfig &config)
-{
-    registry.emplace<Health>(entity, Health{config.health, config.health});
-    registry.emplace<Movement>(entity, Movement{config.speed});
-    auto attack = config.attackData;
-    attack.remaining = 0;
-    registry.emplace<MeleeAttack>(entity, attack);
-    //    auto abilities = config.characterClass;
-    //   registry.emplace<Abilities>(entity, abilities);
-}
 
 CharacterConfig LoadCharacter(entt::registry &registry, const char *role)
 {
@@ -60,6 +51,21 @@ CharacterConfig LoadCharacter(entt::registry &registry, const char *role)
     throw std::runtime_error("Gameplay object not loaded: " + config.model);
 }
 
+
+namespace {
+void AttachCharacter(entt::registry &registry, entt::entity entity, const CharacterConfig &config)
+{
+    registry.emplace<Health>(entity, Health{config.health, config.health});
+    registry.emplace<Movement>(entity, Movement{config.speed});
+    auto attack = config.attackData;
+    attack.remaining = 0;
+    registry.emplace<MeleeAttack>(entity, attack);
+    //    auto abilities = config.characterClass;
+    //   registry.emplace<Abilities>(entity, abilities);
+}
+
+
+
 VampiricDrainAttack LoadVampiricDrain(const GameConfig &settings)
 {
     VampiricDrainAttack drain{settings.RequireFloat("VampireQueen", "drainDamage"),
@@ -70,6 +76,61 @@ VampiricDrainAttack LoadVampiricDrain(const GameConfig &settings)
         throw std::runtime_error("Invalid VampireQueen drain tuning: values must be nonnegative");
     return drain; // RequireFloat already rejects nonfinite values.
 }
+     
+SpawnSquiresAttack LoadSquireSpawn(const GameConfig &settings)
+{
+    
+    SpawnSquiresAttack spawn;
+    spawn.SquireMin = settings.RequireFloat("UndeadKnight", "squireMin");
+    spawn.SquireMax = settings.RequireFloat("UndeadKnight", "squireMax");
+    spawn.CoolDown =  settings.RequireFloat("UndeadKnight", "summonCD");
+    spawn.Radius = settings.RequireFloat("UndeadKnight", "spawnRadius");
+    
+    if(spawn.SquireMin < 0 || spawn.SquireMax < 0 || spawn.CoolDown < 0 || spawn.Radius < 0)
+        throw std::runtime_error("Knight has improper values");
+    return spawn;      
+}
+
+Ring ReturnRingRadius(const GameConfig& settings, const std::string& section, const std::string& key)
+{
+    std::string raw = settings.at(section).at(key).as<std::string>();
+
+    for(char& c : raw)
+        {
+            if (c == ',') 
+                c = ' ';
+        }
+
+
+    std::stringstream ss(raw);
+    Ring ring;
+
+    ss >> ring.Inner >> ring.Outter;
+
+    return ring;
+}
+
+
+RingAttackStats LoadKnightRingAttack(const GameConfig &settings)
+{
+    RingAttackStats Ring;
+
+    Ring.CoolDown = settings.RequireFloat("UndeadKnight","ringCooldown");
+    Ring.Damage = settings.RequireFloat("UndeadKnight", "ringDamage");
+    Ring.WaitTime = settings.RequireFloat("UndeadKnight", "ringWaitTime");
+
+    Ring.Rings[0] = ReturnRingRadius(settings,"UndeadKnight", "ring1");
+    Ring.Rings[1] = ReturnRingRadius(settings, "UndeadKnight", "ring2");
+    Ring.Rings[2] = ReturnRingRadius(settings, "UndeadKnight", "ring3");
+
+    Ring.state = RingState::Idle;
+    Ring.CoolDown = 0;
+
+    return Ring;
+
+}
+
+
 
 HordeSpawner LoadHordeSpawner(const GameConfig &settings)
 {
@@ -102,6 +163,9 @@ HordeSpawner LoadHordeSpawner(const GameConfig &settings)
 
 void InitializeGameplaySettings(entt::registry &registry, const GameConfig &settings)
 {
+    // Session tuning survives level reloads and restarts.
+    if (registry.ctx().contains<GameplayCameraConfig>())
+        return;
     GameplayCameraConfig cameraConfig{{settings.RequireFloat("GameplayCamera", "x"),
                                        settings.RequireFloat("GameplayCamera", "y"),
                                        settings.RequireFloat("GameplayCamera", "z"), 0}};
@@ -189,16 +253,26 @@ entt::entity CreateRenderable(entt::registry &registry, const std::string &model
 
 void InitializeGameplay(entt::registry &registry)
 {
+    // The only initial-state owner. A transition supplies the active level beforehand.
+    const auto &initialSettings = *registry.ctx().get<UTIL::Config>().gameConfig;
+    if (!registry.ctx().contains<DungeonState>())
+        registry.ctx().emplace<DungeonState>(DungeonState{
+            initialSettings.at("DungeonKey").at("level").as<int>()});
+
+
+    ResetEnemyKillCounter();
     const auto &settings = *registry.ctx().get<UTIL::Config>().gameConfig;
     const auto playerConfig = LoadCharacter(registry, "Player");
     const auto enemyConfig = LoadCharacter(registry, "Enemy");
+   
     const auto spawner = LoadHordeSpawner(settings);
     InitializeGameplaySettings(registry, settings);
     InitializeDungeonKeys(registry);
 
     // The shared recipe is parsed once. Each actor still owns independent ECS state.
-    InitializeDamageFeedback(registry);
-    registry.ctx().emplace<CharacterConfig>(enemyConfig);
+    if (!registry.ctx().contains<DamageFeedbackConfig>())
+        InitializeDamageFeedback(registry);
+    registry.ctx().insert_or_assign(enemyConfig);
     const auto player =
         CreateRenderable(registry, playerConfig.model, playerConfig.transform.matrix);
     registry.emplace<Player>(player);
@@ -206,45 +280,6 @@ void InitializeGameplay(entt::registry &registry)
     registry.emplace<WarriorAOE>(player);
     registry.emplace<AxeThrow>(player);
     AttachCharacter(registry, player, playerConfig);
-
-    // Testing the health pickup
-
-    // Spawn it a little to the right of the player
-    auto potionTransform = playerConfig.transform;
-    potionTransform.matrix.row4.x += 3.0f;
-
-    // Trying out the complete health potion model
-    const auto healthPotion = CreateRenderable(registry, "HealthPotion", potionTransform.matrix);
-
-    // Health pickup restores 25 HP
-    registry.emplace<PickUp>(healthPotion, PickUp{BounsStatPickUpType::HealthRestore, 25.0f});
-
-    // Lower player health for testing
-    auto &playerHealth = registry.get<Health>(player);
-    playerHealth.current = (std::max)(0.0f, playerHealth.maximum - 50.0f);
-
-    // Debug messages to check if everything works
-    std::cout << "TEST: Health potion spawned 3 units to the right!" << std::endl;
-
-    std::cout << "TEST: Player HP is " << playerHealth.current << "/" << playerHealth.maximum
-              << std::endl;
-
-    // Testing the speed boost potion
-
-    // Spawn another potion 7 units to the right of the player.
-    // This keeps it separate from our health potion.
-    auto speedPotionTransform = playerConfig.transform;
-    speedPotionTransform.matrix.row4.x += 7.0f;
-
-    // Use the health potion model temporarily.
-    // I'll replace it with a blue potion later.
-    const auto speedPotion = CreateRenderable(registry, "SpeedPotion", speedPotionTransform.matrix);
-
-    // Give this potion the temporary speed boost effect.
-    registry.emplace<PickUp>(speedPotion, PickUp{BounsStatPickUpType::BonusSpeed, 0.5f});
-
-    // Print a message so I know the potion spawned.
-    std::cout << "TEST: Speed potion spawned 7 units to the right!" << std::endl;
 
     CreateEnemy(registry, enemyConfig, enemyConfig.transform.matrix);
     CreateEnemy(registry, enemyConfig, enemyConfig.transform.matrix);
@@ -257,6 +292,7 @@ void InitializeGameplay(entt::registry &registry)
     wizardPlacement.row4.x -= 5.0f;
     wizardPlacement.row4.z += 3.0f;
     CreateEnemyVariant(registry, enemyConfig, wizardPlacement, EnemyVariant::Wizard);
+
     const auto drainConfig = LoadVampiricDrain(settings);
     const auto queenModel = settings.at("VampireQueen").at("model").as<std::string>();
     const auto *models = registry.ctx().find<DRAW::ModelManager>();
@@ -269,6 +305,30 @@ void InitializeGameplay(entt::registry &registry)
                   << " in the selected level (export its H2B and object with gameType != none)."
                   << std::endl;
     }
+
+    const auto KnightSpawnConfig = LoadSquireSpawn(settings);    
+    const auto KnightRingAttack = LoadKnightRingAttack(settings);
+    const auto KnightModel = settings.at("UndeadKnight").at("model").as<std::string>();
+    
+    if(models && models->models.contains(KnightModel) &&
+
+        !models->models.at(KnightModel).meshEntities.empty())
+        {
+            const auto KnightConfig = LoadCharacter(registry,"UndeadKnight");
+            CreateUndeadKnight(registry,KnightConfig,KnightSpawnConfig,KnightRingAttack,KnightConfig.transform.matrix);                
+
+        }
+
+        else{
+
+            std::cout << "Undead Knight not spawned: missing dynamic Blender template " << KnightModel
+                     << " in the selected level (export its H2B and object with gameType != none)."
+                    << std::endl;
+
+        }
+
+
+
     const auto spawnerEntity = registry.create();
     registry.emplace<HordeSpawner>(spawnerEntity, spawner);
     registry.emplace<Transform>(spawnerEntity, enemyConfig.transform);
@@ -301,6 +361,8 @@ void RestartGame(entt::registry &registry)
             registry.destroy(entity); // MeshCollection owns each actor's visible meshes.
     registry.ctx().erase<DungeonState>();
     CurrentState.playerScore = 0;
+    // Restart the current dungeon, including after Level 2 completion.
+    registry.ctx().get<DungeonState>() = DungeonState{registry.ctx().get<DungeonState>().level};
     InitializeGameplay(registry);
     ChangeScreen(Screens::Playing);
 }
@@ -350,6 +412,13 @@ void UpdateGameSystems(entt::registry &registry)
         DestroyPendingEntities(registry);
         return;
     }
+    UpdateKnight(registry,deltaTime);
+    if (CurrentState.ActiveScreen != Screens::Playing) {
+        DestroyPendingEntities(registry);
+        return;
+    }
+    
+    
     // Combat deaths free population slots now; new enemies begin AI next frame.
     // Spawn before mesh synchronization so new instances render at their placement immediately.
     UpdateHordeSpawner(registry, deltaTime);
@@ -357,6 +426,8 @@ void UpdateGameSystems(entt::registry &registry)
     IntegrateVelocity(registry, deltaTime);
     CollectDungeonKey(registry);
     UseDungeonKey(registry);
+    if (registry.ctx().get<DungeonState>().transitionPending)
+        return;
     SynchronizeMeshTransforms(registry);
     DestroyPendingEntities(registry);
 }
@@ -970,12 +1041,166 @@ entt::entity CreateVampireQueen(entt::registry &registry, const CharacterConfig 
     return queen;
 }
 
+entt::entity CreateUndeadKnight(entt::registry &registry,const CharacterConfig &config,
+                                    const SpawnSquiresAttack &special,
+                                    const RingAttackStats &special2,
+                                    const GW::MATH::GMATRIXF &placement)
+{
+    const auto Knight = CreateRenderable(registry,config.model,placement);
+
+  try
+  {
+    registry.emplace<Enemy>(Knight,Enemy{true,0});
+    registry.emplace<UndeadKnight>(Knight);
+    AttachCharacter(registry,Knight,config);
+    auto SpawnSquires = special;
+    auto RingAttack = special2;
+    SpawnSquires.Remaining = 0;
+    RingAttack.Remaining = 0;
+    registry.emplace<SpawnSquiresAttack>(Knight,SpawnSquires);
+    registry.emplace<RingAttackStats>(Knight,RingAttack);
+  }
+
+  catch(...) 
+  {
+    registry.destroy(Knight);
+    throw;
+  }
+  return Knight;
+}
+
 float GroundDistance(entt::registry &registry, entt::entity a, entt::entity b)
 {
     const auto &p = registry.get<Transform>(a).matrix.row4;
     const auto &q = registry.get<Transform>(b).matrix.row4;
     const float x = q.x - p.x, z = q.z - p.z;
     return std::sqrt(x * x + z * z);
+}
+
+
+namespace {
+void ValidateTransitionTarget(const std::string &path, const std::string &models,
+                              const GameConfig &settings)
+{
+    std::ifstream input(path);
+    if (!input)
+        throw std::runtime_error("Level file unavailable: " + path);
+    const auto json = nlohmann::json::parse(input);
+    std::set<std::string> dynamicModels;
+    std::set<std::string> objects;
+    for (const auto &object : json.at("entities")) {
+        if (!object.at("is_mesh").get<bool>())
+            continue;
+        const auto name = object.at("name").get<std::string>();
+        const auto model = name.substr(0, name.find_last_of('.')) + ".h2b";
+        H2B::Parser parser;
+        const auto modelPath = (std::filesystem::path(models) / model).string();
+        if (!parser.Parse(modelPath.c_str()))
+            throw std::runtime_error("Level " + path + ": invalid/missing H2B " + modelPath);
+        objects.insert(name);
+        if (object.contains("gameType") && object.at("gameType") != "none")
+            dynamicModels.insert(name);
+    }
+    // These templates are used unconditionally by existing gameplay (including drops).
+    std::vector<std::string> required{
+        settings.at("Player").at("model").as<std::string>(),
+        settings.at("Enemy").at("model").as<std::string>(),
+        settings.at("DungeonKey").at("model").as<std::string>(),
+        settings.at("DungeonExit").at("model").as<std::string>(),
+        "ThrowingAxe", "PurpleSpellEffect", "HealthPotion", "SpeedPotion", "DefensivePotion"};
+    const auto knight = settings.at("UndeadKnight").at("model").as<std::string>();
+    if (objects.contains(knight)) {
+        required.push_back(knight);
+        required.push_back("KnightRing");
+        required.push_back(settings.at("Squire").at("model").as<std::string>());
+    }
+    std::string missing;
+    for (const auto &name : required)
+        if (!dynamicModels.contains(name))
+            missing += (missing.empty() ? "" : ", ") + name;
+    if (!missing.empty())
+        throw std::runtime_error("Level " + path + ": missing dynamic gameplay templates: " + missing);
+}
+}
+
+void ProcessLevelTransition(entt::registry &registry)
+{
+    const auto state = registry.ctx().get<DungeonState>();
+    if (!state.transitionPending)
+        return;
+    // Called only between gameplay update and the next Vulkan/ImGui frame.
+    const auto display = registry.view<DRAW::VulkanRenderer>().front();
+    const auto &settings = *registry.ctx().get<UTIL::Config>().gameConfig;
+    const auto player = registry.view<Player>().front();
+    std::string path, models;
+    try {
+        path = settings.at("Content").at("level2").as<std::string>();
+        models = settings.at("Content").at("models").as<std::string>();
+        ValidateTransitionTarget(path, models, settings);
+    } catch (const std::exception &error) {
+        // Validation is read-only: keep the playable old level and return its consumed key.
+        auto &current = registry.ctx().get<DungeonState>();
+        current.transitionPending = false;
+        current.transitionFailed = true; // Avoid retrying/logging every frame at the exit.
+        registry.emplace_or_replace<DungeonKey>(player, registry.ctx().get<DungeonKeyConfig>().key);
+        std::cerr << "Level transition to level2 rejected before unloading: " << error.what() << '\n';
+        return;
+    }
+    if (display == entt::null || registry.view<DRAW::Camera>().empty())
+        throw std::runtime_error("level2 transition requires a live renderer and camera");
+
+    // Copy only player values, never old entity/mesh references or the consumed dungeon key.
+    auto copy = [&]<typename T>() -> std::optional<T> {
+        if (const auto *value = registry.try_get<T>(player))
+            return *value;
+        return std::nullopt;
+    };
+    const auto progression = std::make_tuple(copy.operator()<Health>(), copy.operator()<Movement>(),
+        copy.operator()<MeleeAttack>(), copy.operator()<BonusStats>(), copy.operator()<SpeedBoost>(),
+        copy.operator()<DefenseBoost>(), copy.operator()<WarriorAOE>(), copy.operator()<AxeThrow>(),
+        copy.operator()<Class>());
+    auto &renderer = registry.get<DRAW::VulkanRenderer>(display);
+    if (const auto result = vkDeviceWaitIdle(renderer.device); result != VK_SUCCESS)
+        throw std::runtime_error("level2 transition GPU wait failed: " + std::to_string(result));
+    std::cout << "Unloading previous level\n";
+
+    // Every non-infrastructure entity belongs to the loaded world. Snapshot first:
+    // MeshCollection destruction can also destroy entities present in this list.
+    std::vector<entt::entity> entities;
+    for (auto [entity] : registry.storage<entt::entity>().each())
+        if (entity != display && !registry.all_of<DRAW::Camera>(entity))
+            entities.push_back(entity);
+    for (auto entity : entities)
+        if (registry.valid(entity))
+            registry.destroy(entity);
+    registry.ctx().erase<DRAW::ModelManager>();
+    registry.remove<DRAW::GPULevel>(display);
+    // These removals invoke the existing Vulkan buffer destruction callbacks once.
+    registry.remove<DRAW::VulkanIndexBuffer>(display);
+    registry.remove<DRAW::VulkanVertexBuffer>(display);
+    registry.remove<DRAW::CPULevel>(display);
+
+    std::cout << "Loading Level 2: " << path << '\n';
+    try {
+        registry.emplace<DRAW::CPULevel>(display, DRAW::CPULevel{path, models, {}});
+        registry.emplace<DRAW::GPULevel>(display);
+        registry.ctx().get<DungeonState>() = DungeonState{2};
+        InitializeGameplay(registry);
+        const auto newPlayer = registry.view<Player>().front();
+        std::apply([&](const auto &...values) {
+            auto restore = [&](const auto &value) {
+                if (value)
+                    registry.emplace_or_replace<typename std::decay_t<decltype(value)>::value_type>(
+                        newPlayer, *value);
+            };
+            (restore(values), ...);
+        }, progression);
+        UpdateCamera(registry);
+    } catch (const std::exception &error) {
+        // Never render or simulate a partially initialized replacement level.
+        throw std::runtime_error("Level 2 initialization failed (" + path + "): " + error.what());
+    }
+    std::cout << "Level 2 initialized successfully\n";
 }
 
 } // namespace GAME

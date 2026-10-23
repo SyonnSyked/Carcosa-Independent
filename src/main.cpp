@@ -154,6 +154,8 @@ int main()
             if (renderer.resourcesReleased)
                 break;
 
+            GAME::ProcessLevelTransition(registry);
+
             ImGui_ImplVulkan_NewFrame();
             ImGui_ImplWin32_NewFrame();
             ImGui::NewFrame();

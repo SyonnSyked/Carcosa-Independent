@@ -138,15 +138,43 @@ void UpdateProjectiles(entt::registry &registry, float deltaTime)
         position.x += dx;
         position.z += dz;
         shot.remaining -= stepTime;
-        if (x * x + z * z <= shot.hitRadius * shot.hitRadius) {
-            auto &health = registry.get<Health>(player);
-            health.current = (std::max)(0.0f, health.current - shot.damage);
+        if (x * x + z * z <= shot.hitRadius * shot.hitRadius)
+        {
+            auto& health = registry.get<Health>(player);
+
+            // Start with the projectile's normal damage.
+            float finalDamage = shot.damage;
+
+            // Check if the player currently has a defense potion active.
+            if (registry.all_of<DefenseBoost>(player))
+            {
+                const auto& defense = registry.get<DefenseBoost>(player);
+
+                // Reduce incoming damage by 10% while the potion is active.
+                if (defense.remaining > 0.0f)
+                {
+                    finalDamage *= (1.0f - defense.damageReduction);
+                }
+            }
+
+            // Apply the damage after checking the defense boost.
+            health.current = (std::max)(0.0f, health.current - finalDamage);
+
+            // Show the damage flash.
             ActivateDamageFlash(registry, player);
-            std::cout << "Projectile hit Player: " << shot.damage << " damage. Health: "
-                      << health.current << " / " << health.maximum << std::endl;
+
+            // Print the actual damage dealt.
+            std::cout << "Projectile hit Player: " << finalDamage
+                << " damage. Health: " << health.current
+                << " / " << health.maximum << std::endl;
+
+            // Remove the projectile after it hits.
             registry.emplace<ToDestroy>(entity);
+
+            // Stop targeting the player if they died.
             if (health.current <= 0)
                 player = entt::null;
+        
         } else if (shot.remaining <= 0)
             registry.emplace<ToDestroy>(entity);
     }
@@ -184,10 +212,31 @@ void UpdateSpellAreas(entt::registry &registry, float deltaTime)
             const float x = position.x - spell.center.x, z = position.z - spell.center.z;
             if (health.current <= 0 || x * x + z * z > spell.radius * spell.radius)
                 continue;
-            health.current = (std::max)(0.0f, health.current - spell.damage);
+            // Start with the wizard's normal spell damage.
+            float finalDamage = spell.damage;
+
+            // Check if the player has an active defense potion.
+            if (registry.all_of<DefenseBoost>(player))
+            {
+                const auto& defense = registry.get<DefenseBoost>(player);
+
+                // Reduce spell damage while the defense potion is active.
+                if (defense.remaining > 0.0f)
+                {
+                    finalDamage *= (1.0f - defense.damageReduction);
+                }
+            }
+
+            // Apply the reduced damage to the player.
+            health.current = (std::max)(0.0f, health.current - finalDamage);
+
+            // Flash the player when they take damage.
             ActivateDamageFlash(registry, player);
-            std::cout << "Wizard AOE hit Player: " << spell.damage << " damage. Health: "
-                      << health.current << " / " << health.maximum << std::endl;
+
+            // Print the damage after applying defense.
+            std::cout << "Wizard AOE hit Player: " << finalDamage
+                << " damage. Health: " << health.current
+                << " / " << health.maximum << std::endl;
         }
     }
     HandleEntityDeath(registry);
