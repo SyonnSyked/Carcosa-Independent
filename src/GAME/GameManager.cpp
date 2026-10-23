@@ -6,6 +6,9 @@
 #include "imgui.h"
 #include <cstdio>
 #include <sstream>
+#include <fstream>
+#include <optional>
+#include <tuple>
 
 namespace GAME {
 GameState CurrentState;
@@ -159,6 +162,9 @@ HordeSpawner LoadHordeSpawner(const GameConfig &settings)
 
 void InitializeGameplaySettings(entt::registry &registry, const GameConfig &settings)
 {
+    // Session tuning survives level reloads and restarts.
+    if (registry.ctx().contains<GameplayCameraConfig>())
+        return;
     GameplayCameraConfig cameraConfig{{settings.RequireFloat("GameplayCamera", "x"),
                                        settings.RequireFloat("GameplayCamera", "y"),
                                        settings.RequireFloat("GameplayCamera", "z"), 0}};
@@ -245,9 +251,12 @@ entt::entity CreateRenderable(entt::registry &registry, const std::string &model
 }
 
 void InitializeGameplay(entt::registry &registry)
-{   
-    if(!registry.ctx().find<DungeonState>())
-    registry.ctx().emplace<DungeonState>(DungeonState{1, false});
+{
+    // The only initial-state owner. A transition supplies the active level beforehand.
+    const auto &initialSettings = *registry.ctx().get<UTIL::Config>().gameConfig;
+    if (!registry.ctx().contains<DungeonState>())
+        registry.ctx().emplace<DungeonState>(DungeonState{
+            initialSettings.at("DungeonKey").at("level").as<int>()});
 
 
     ResetEnemyKillCounter();
@@ -260,8 +269,9 @@ void InitializeGameplay(entt::registry &registry)
     InitializeDungeonKeys(registry);
 
     // The shared recipe is parsed once. Each actor still owns independent ECS state.
-    InitializeDamageFeedback(registry);
-    registry.ctx().emplace<CharacterConfig>(enemyConfig);
+    if (!registry.ctx().contains<DamageFeedbackConfig>())
+        InitializeDamageFeedback(registry);
+    registry.ctx().insert_or_assign(enemyConfig);
     const auto player =
         CreateRenderable(registry, playerConfig.model, playerConfig.transform.matrix);
     registry.emplace<Player>(player);
@@ -348,7 +358,8 @@ void RestartGame(entt::registry &registry)
     for (auto entity : gameplayEntities)
         if (registry.valid(entity))
             registry.destroy(entity); // MeshCollection owns each actor's visible meshes.
-    registry.ctx().erase<DungeonState>();
+    // Restart the current dungeon, including after Level 2 completion.
+    registry.ctx().get<DungeonState>() = DungeonState{registry.ctx().get<DungeonState>().level};
     InitializeGameplay(registry);
     ChangeScreen(Screens::Playing);
 }
@@ -412,6 +423,8 @@ void UpdateGameSystems(entt::registry &registry)
     IntegrateVelocity(registry, deltaTime);
     CollectDungeonKey(registry);
     UseDungeonKey(registry);
+    if (registry.ctx().get<DungeonState>().transitionPending)
+        return;
     SynchronizeMeshTransforms(registry);
     DestroyPendingEntities(registry);
 }
@@ -1022,50 +1035,129 @@ float GroundDistance(entt::registry &registry, entt::entity a, entt::entity b)
 }
 
 
-void LoadLevel(entt::registry& registry, const std::string& levelKey)
+namespace {
+void ValidateTransitionTarget(const std::string &path, const std::string &models,
+                              const GameConfig &settings)
 {
-    entt::entity display = entt::null;
-    auto* saveStatePtr = registry.ctx().find<DungeonState>();
-
-    DungeonState saveState = saveStatePtr ? *saveStatePtr : DungeonState{1, false};
-    for(auto entity : registry.view<DRAW::VulkanRenderer>())
-    {
-        display = entity;
-        break;
+    std::ifstream input(path);
+    if (!input)
+        throw std::runtime_error("Level file unavailable: " + path);
+    const auto json = nlohmann::json::parse(input);
+    std::set<std::string> dynamicModels;
+    std::set<std::string> objects;
+    for (const auto &object : json.at("entities")) {
+        if (!object.at("is_mesh").get<bool>())
+            continue;
+        const auto name = object.at("name").get<std::string>();
+        const auto model = name.substr(0, name.find_last_of('.')) + ".h2b";
+        H2B::Parser parser;
+        const auto modelPath = (std::filesystem::path(models) / model).string();
+        if (!parser.Parse(modelPath.c_str()))
+            throw std::runtime_error("Level " + path + ": invalid/missing H2B " + modelPath);
+        objects.insert(name);
+        if (object.contains("gameType") && object.at("gameType") != "none")
+            dynamicModels.insert(name);
     }
+    // These templates are used unconditionally by existing gameplay (including drops).
+    std::vector<std::string> required{
+        settings.at("Player").at("model").as<std::string>(),
+        settings.at("Enemy").at("model").as<std::string>(),
+        settings.at("DungeonKey").at("model").as<std::string>(),
+        settings.at("DungeonExit").at("model").as<std::string>(),
+        "ThrowingAxe", "PurpleSpellEffect", "HealthPotion", "SpeedPotion", "DefensivePotion"};
+    const auto knight = settings.at("UndeadKnight").at("model").as<std::string>();
+    if (objects.contains(knight)) {
+        required.push_back(knight);
+        required.push_back("KnightRing");
+        required.push_back(settings.at("Squire").at("model").as<std::string>());
+    }
+    std::string missing;
+    for (const auto &name : required)
+        if (!dynamicModels.contains(name))
+            missing += (missing.empty() ? "" : ", ") + name;
+    if (!missing.empty())
+        throw std::runtime_error("Level " + path + ": missing dynamic gameplay templates: " + missing);
+}
+}
 
+void ProcessLevelTransition(entt::registry &registry)
+{
+    const auto state = registry.ctx().get<DungeonState>();
+    if (!state.transitionPending)
+        return;
+    // Called only between gameplay update and the next Vulkan/ImGui frame.
+    const auto display = registry.view<DRAW::VulkanRenderer>().front();
+    const auto &settings = *registry.ctx().get<UTIL::Config>().gameConfig;
+    const auto player = registry.view<Player>().front();
+    std::string path, models;
+    try {
+        path = settings.at("Content").at("level2").as<std::string>();
+        models = settings.at("Content").at("models").as<std::string>();
+        ValidateTransitionTarget(path, models, settings);
+    } catch (const std::exception &error) {
+        // Validation is read-only: keep the playable old level and return its consumed key.
+        auto &current = registry.ctx().get<DungeonState>();
+        current.transitionPending = false;
+        current.transitionFailed = true; // Avoid retrying/logging every frame at the exit.
+        registry.emplace_or_replace<DungeonKey>(player, registry.ctx().get<DungeonKeyConfig>().key);
+        std::cerr << "Level transition to level2 rejected before unloading: " << error.what() << '\n';
+        return;
+    }
+    if (display == entt::null || registry.view<DRAW::Camera>().empty())
+        throw std::runtime_error("level2 transition requires a live renderer and camera");
 
+    // Copy only player values, never old entity/mesh references or the consumed dungeon key.
+    auto copy = [&]<typename T>() -> std::optional<T> {
+        if (const auto *value = registry.try_get<T>(player))
+            return *value;
+        return std::nullopt;
+    };
+    const auto progression = std::make_tuple(copy.operator()<Health>(), copy.operator()<Movement>(),
+        copy.operator()<MeleeAttack>(), copy.operator()<BonusStats>(), copy.operator()<SpeedBoost>(),
+        copy.operator()<DefenseBoost>(), copy.operator()<WarriorAOE>(), copy.operator()<AxeThrow>(),
+        copy.operator()<Class>());
+    auto &renderer = registry.get<DRAW::VulkanRenderer>(display);
+    if (const auto result = vkDeviceWaitIdle(renderer.device); result != VK_SUCCESS)
+        throw std::runtime_error("level2 transition GPU wait failed: " + std::to_string(result));
+    std::cout << "Unloading previous level\n";
+
+    // Every non-infrastructure entity belongs to the loaded world. Snapshot first:
+    // MeshCollection destruction can also destroy entities present in this list.
     std::vector<entt::entity> entities;
-
-    for(auto check : registry.view<entt::entity>())
-    {
-        entities.push_back(check);
-    }
-
-    for(auto check : entities)
-    {
-        if(check != display)
-        registry.destroy(check);
-    }
-
-
+    for (auto [entity] : registry.storage<entt::entity>().each())
+        if (entity != display && !registry.all_of<DRAW::Camera>(entity))
+            entities.push_back(entity);
+    for (auto entity : entities)
+        if (registry.valid(entity))
+            registry.destroy(entity);
     registry.ctx().erase<DRAW::ModelManager>();
-    registry.ctx().erase<DRAW::CPULevel>();
-    registry.ctx().erase<DRAW::GPULevel>();
-    registry.ctx().erase<CharacterConfig>();
+    registry.remove<DRAW::GPULevel>(display);
+    // These removals invoke the existing Vulkan buffer destruction callbacks once.
+    registry.remove<DRAW::VulkanIndexBuffer>(display);
+    registry.remove<DRAW::VulkanVertexBuffer>(display);
+    registry.remove<DRAW::CPULevel>(display);
 
-    const auto& settings = *registry.ctx().get<UTIL::Config>().gameConfig;
-    std::string LevelPath = settings.at("Content").at(levelKey).as<std::string>(); 
-
-    registry.emplace<DRAW::CPULevel>(display,DRAW::CPULevel{LevelPath,settings.at("Content").at("models").as<std::string>(),{}});
-    registry.ctx().emplace<DungeonState>(saveState);
-
-    registry.emplace<DRAW::GPULevel>(display);
-
-    GAME::InitializeGameplay(registry);
-
-    ChangeScreen(Screens::Playing);
-
+    std::cout << "Loading Level 2: " << path << '\n';
+    try {
+        registry.emplace<DRAW::CPULevel>(display, DRAW::CPULevel{path, models, {}});
+        registry.emplace<DRAW::GPULevel>(display);
+        registry.ctx().get<DungeonState>() = DungeonState{2};
+        InitializeGameplay(registry);
+        const auto newPlayer = registry.view<Player>().front();
+        std::apply([&](const auto &...values) {
+            auto restore = [&](const auto &value) {
+                if (value)
+                    registry.emplace_or_replace<typename std::decay_t<decltype(value)>::value_type>(
+                        newPlayer, *value);
+            };
+            (restore(values), ...);
+        }, progression);
+        UpdateCamera(registry);
+    } catch (const std::exception &error) {
+        // Never render or simulate a partially initialized replacement level.
+        throw std::runtime_error("Level 2 initialization failed (" + path + "): " + error.what());
+    }
+    std::cout << "Level 2 initialized successfully\n";
 }
 
 } // namespace GAME
