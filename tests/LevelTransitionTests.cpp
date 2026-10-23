@@ -33,9 +33,13 @@ void AcquireBossKeyAtExit(entt::registry &r)
     // Preserve the boss's authored scale/rotation: the knight is scaled to 0.01.
     r.get<GAME::Transform>(boss).matrix.row4 = placement.matrix.row4;
     r.get<GAME::Health>(boss).current = 1;
+    const auto previousScore = GAME::CurrentState.playerScore;
+    const auto points = r.get<GAME::Enemy>(boss).scorePoints;
     r.get<GAME::MeleeAttack>(player).remaining = 0;
     GAME::TryMeleeAttack(r, player, boss);
     GAME::HandleEntityDeath(r);
+    Check(GAME::CurrentState.playerScore == previousScore + points,
+          "boss death awards points exactly once across repeated death handling");
     Check(Count<GAME::DungeonKey>(r) == 1, "boss death drops exactly one key");
     const auto item = r.view<GAME::DungeonKey>().front();
     const auto source = r.ctx().get<DRAW::ModelManager>().models.at("Key").meshEntities.front();
@@ -118,7 +122,12 @@ void Run()
     const auto vertexBuffer = r.get<DRAW::VulkanVertexBuffer>(display).buffer;
     GAME::ChangeScreen(GAME::Screens::MainMenu);
     draw();
-    GAME::ChangeScreen(GAME::Screens::Playing);
+    GAME::AddToPlayerScore(250);
+    GAME::RestartGame(r); // Same action as the main menu Start button.
+    Check(GAME::CurrentState.playerScore == 0 &&
+          GAME::CurrentState.ActiveScreen == GAME::Screens::Playing &&
+          r.ctx().get<GAME::DungeonState>().level == 1 && Count<GAME::Player>(r) == 1,
+          "Start resets score and retains valid dungeon state without duplicate players");
     draw();
 
     AcquireBossKeyAtExit(r);
@@ -148,7 +157,10 @@ void Run()
         if (entity != display && entity != camera)
             oldEntities.push_back(entity);
     GAME::UseDungeonKey(r);
+    const auto scoreBeforeTransition = GAME::CurrentState.playerScore;
     GAME::ProcessLevelTransition(r);
+    Check(GAME::CurrentState.playerScore == scoreBeforeTransition,
+          "score survives level transition");
     Check(r.ctx().get<GAME::DungeonState>().level == 2 &&
           !r.ctx().get<GAME::DungeonState>().transitionPending, "active level is 2");
     for (auto entity : oldEntities)
@@ -184,6 +196,7 @@ void Run()
           GAME::CurrentState.ActiveScreen == GAME::Screens::WinMenu, "Level 2 completes to WinMenu");
     draw();
     GAME::RestartGame(r);
+    Check(GAME::CurrentState.playerScore == 0, "restart resets score after victory");
     Check(r.ctx().get<GAME::DungeonState>().level == 2 &&
           Count<GAME::Player>(r) == 1 && Count<GAME::DungeonExit>(r) == 1,
           "restart retains active dungeon without duplicates");

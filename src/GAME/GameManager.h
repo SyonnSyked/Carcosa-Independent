@@ -10,6 +10,7 @@ namespace GAME {
 struct GameState {
     Screens ActiveScreen = Screens::MainMenu;
     bool Running = true;
+    unsigned int playerScore = 0;
 };
 
 struct ButtonDim {
@@ -30,6 +31,9 @@ void RenderScreens(entt::registry &registry);
 void DrawBlackWindow();
 void ButtonStyleSetup();
 CharacterConfig LoadCharacter(entt::registry &registry, const char *role);
+
+void DrawHighScore(entt::registry &registry);
+void AddToPlayerScore(unsigned int points);
 
 struct CharacterConfig;
 struct VampiricDrainAttack;

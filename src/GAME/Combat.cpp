@@ -271,6 +271,7 @@ void HandleEntityDeath(entt::registry& registry)
             {
                 // Count this enemy as defeated.
                 totalEnemyKills++;
+                AddToPlayerScore(registry.get<Enemy>(victim).scorePoints);
 
                 // Print our updated kill count.
                 std::cout << "Enemy defeated! Total Kills: "

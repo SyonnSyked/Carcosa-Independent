@@ -46,6 +46,7 @@ struct Enemy {
     bool isBoss;
 
     int whichKeyToDrop;
+    unsigned int scorePoints = 100;
 };
 
 enum class EnemyVariant { Melee, Ranged, Wizard, Squire};
