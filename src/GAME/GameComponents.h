@@ -232,6 +232,8 @@ struct DungeonKeyConfig {
 struct DungeonState {
     int level;
     bool complete = false;
+    bool transitionPending = false;
+    bool transitionFailed = false;
 };
 
 struct PickUp {
