@@ -18,6 +18,7 @@ set(PROJECT_SOURCES
     src/GAME/Player.cpp
     src/GAME/Collision.cpp
     src/GAME/Enemy.cpp
+    src/GAME/KnightBoss.cpp
     src/GAME/Boss.cpp
     src/GAME/Combat.cpp
     src/GAME/PickUp&Apply.cpp
