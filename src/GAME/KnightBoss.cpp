@@ -13,14 +13,14 @@ namespace GAME
 void SpawnSquires(entt::registry &registry, float deltaTime)
 {
         
-        auto& Knights = registry.view<UndeadKnight,Enemy,Transform,Movement,MeleeAttack,SpawnSquiresAttack,Health>();
+        auto Knights = registry.view<UndeadKnight,Enemy,Transform,Movement,MeleeAttack,SpawnSquiresAttack,Health>();
         //need to stop his movement and spawn four squires around him
        for(auto Knight : Knights)
        {
             auto& attack = registry.get<SpawnSquiresAttack>(Knight);   
             auto& KnightLocation = registry.get<Transform>(Knight);
             auto& KnightHp = registry.get<Health>(Knight);
-            const double SquireRadius = registry.ctx().get<CollisionConfig>();
+            const double SquireRadius = registry.ctx().get<CollisionConfig>().playerRadius;
 
 
                 if(attack.Remaining > 0){

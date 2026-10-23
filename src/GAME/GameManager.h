@@ -29,6 +29,7 @@ void DrawWinScreen(entt::registry &registry);
 void RenderScreens(entt::registry &registry);
 void DrawBlackWindow();
 void ButtonStyleSetup();
+CharacterConfig LoadCharacter(entt::registry &registry, const char *role);
 
 struct CharacterConfig;
 struct VampiricDrainAttack;
