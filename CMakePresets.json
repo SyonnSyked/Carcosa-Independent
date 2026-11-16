@@ -8,6 +8,7 @@
             "binaryDir": "${sourceDir}/build/dev",
             "cacheVariables": {
                 "CMAKE_BUILD_TYPE": "Debug",
+                "CMAKE_C_COMPILER": "clang-cl",
                 "CMAKE_CXX_COMPILER": "clang-cl",
                 "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
             }

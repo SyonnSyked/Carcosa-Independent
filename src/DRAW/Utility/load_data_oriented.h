@@ -74,6 +74,11 @@ public:
 	std::vector<MODEL_INSTANCES> levelInstances;
 
 	std::vector<BLENDER_OBJECT> blenderObjects;
+
+    // Transitional adapter: glTF scenery feeds the existing GPU geometry layout.
+    void AppendGltfEnvironment(const std::filesystem::path& path,
+                              const GW::MATH::GVECTORF& scale,
+                              const GW::MATH::GVECTORF& translation);
 	
 
 	bool LoadLevel(	const char* gameLevelPath, 
@@ -113,6 +118,7 @@ public:
 		levelMeshes.clear();
 		levelModels.clear();
 		levelTransforms.clear();
+		levelColliders.clear();
 		levelInstances.clear();
 		blenderObjects.clear();
 	}

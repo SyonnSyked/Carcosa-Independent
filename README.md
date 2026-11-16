@@ -10,6 +10,7 @@ A Windows C++20 game prototype for Project & Portfolio V. The current scene has 
 - LLVM `clang-cl`
 - Visual Studio Build Tools with the C++ tools and Windows SDK available to `clang-cl`
 - Vulkan SDK with `VULKAN_SDK` set
+- Git and internet access on the first CMake configure (for fastgltf and its dependencies)
 
 ## Build and run
 
@@ -22,6 +23,41 @@ cmake --build --preset dev
 ```
 
 The run script launches `build/dev/Carcosa.exe`. Each build automatically copies configuration, shaders, and assets beside the executable, including builds after data-only edits. The game resolves those resources from its executable directory regardless of the launch working directory. CMake writes the clangd compilation database to `build/dev`; the project-local `.clangd` points clangd there.
+
+## fastgltf dependency
+
+CMake fetches fastgltf v1.0.0 at a pinned release commit and links the static
+`fastgltf::fastgltf` target into Carcosa. Its simdjson and simdutf dependencies are
+handled by upstream CMake. Downloads and compiled libraries live under the build
+directory; no global installation or manual include/library paths are needed.
+Use the normal configure and build commands above from a Visual Studio developer
+shell with the C++ tools available.
+
+Game source files can now include the library directly:
+
+```cpp
+#include <fastgltf/core.hpp>
+#include <fastgltf/parser.hpp>
+#include <fastgltf/types.hpp>
+#include <fastgltf/tools.hpp> // accessor and transform helpers
+```
+
+The legacy Dropper/JSON/H2B path remains available. Static GLB scenery now loads
+through fastgltf into the existing renderer alongside H2B gameplay assets.
+See [fastgltf's documentation](https://fastgltf.readthedocs.io/).
+
+An optional standalone check verifies headers, linking, and scene parsing:
+
+```powershell
+cmake --preset dev -DCARCOSA_FASTGLTF_TESTS=ON
+cmake --build --preset dev --target FastGltfSmoke
+ctest --test-dir build/dev -R FastGltfIntegration --output-on-failure
+```
+
+For a local fastgltf checkout, configure with
+`cmake --preset dev -DFETCHCONTENT_SOURCE_DIR_FASTGLTF=C:/path/to/fastgltf`.
+Keep it on the pinned release. Offline configuration also requires its simdjson
+and simdutf dependencies to have been cached or provided locally.
 
 ## Official Release submission
 
@@ -48,11 +84,40 @@ This automatically builds Release, recreates `build/release/distribution`, and c
 
 ## Add visible content
 
+The first playable level is now `assets/levels/Level_1.json`. It combines the
+new Blender export `Level_1.glb` with the surviving H2B gameplay templates
+(Warrior, enemies, boss, exit, weapons, effects, and pickups). The old
+`Level1.json` and all its assets remain available.
+
+`Level_1.glb` currently contains a single floor tile approximately 2 by 2 units.
+The manifest's `environment` block scales X/Z by 30 to make a temporary arena
+approximately 60 by 60 units and lowers it by 0.125164 so the top is at Y=0.
+Actor placements retain their previous positions, scales, and orientations.
+Re-export to the same GLB path, rebuild, and restart to update the floor.
+When exporting a full-size level, change the manifest scale to `[1, 1, 1]` and
+adjust translation to match the authored ground height.
+
+Environment paths are relative to the level manifest. The importer traverses
+the selected glTF scene hierarchy, transforms positions and normals, converts
+right handed glTF coordinates to the game's left handed world, and uses base
+color/emissive values with the existing lighting. This initial path supports
+static triangle meshes with normals and opaque, untextured materials, including
+double-sided geometry. Unsupported textured/transparent materials, animations,
+skins, and morph targets fail explicitly. It does not yet provide full PBR
+shading or import collision metadata. The floor does not block horizontal
+movement, and there are no new arena boundary walls.
+
+With `CARCOSA_FASTGLTF_TESTS=ON`, the `GltfEnvironment` CTest checks the actual
+floor geometry, bounds, normals, and legacy templates. With
+`CARCOSA_TRANSITION_TESTS=ON`, `LevelTransition` exercises Vulkan rendering,
+gameplay startup/restart, and transition from the new first level to the existing
+second level.
+
 Code defines behavior; data defines scene content and tuning. Select the level and model directory in `config/game.ini`:
 
 ```ini
 [Content]
-level=assets/levels/Level1.json
+level=assets/levels/Level_1.json
 models=assets/models
 ```
 

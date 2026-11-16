@@ -14,6 +14,18 @@ void Construct_CPULevel(entt::registry &registry, entt::entity entity)
 
     if (!cpuLevel.lvlData.LoadLevel(cpuLevel.levelPath.c_str(), cpuLevel.modelFolder.c_str(), log))
         throw std::runtime_error("Could not load world: " + cpuLevel.levelPath);
+    std::ifstream manifestFile(cpuLevel.levelPath);
+    const auto manifest = nlohmann::json::parse(manifestFile);
+    if (manifest.contains("environment")) {
+        const auto& environment = manifest.at("environment");
+        const auto scale = environment.value("scale", std::vector<float>{1, 1, 1});
+        const auto offset = environment.value("translation", std::vector<float>{0, 0, 0});
+        if (scale.size() != 3 || offset.size() != 3)
+            throw std::runtime_error("Environment scale/translation must have three values");
+        cpuLevel.lvlData.AppendGltfEnvironment(
+            std::filesystem::path(cpuLevel.levelPath).parent_path() / environment.at("file").get<std::string>(),
+            {scale[0], scale[1], scale[2], 0}, {offset[0], offset[1], offset[2], 0});
+    }
 }
 
 void Construct_GPULevel(entt::registry &registry, entt::entity entity)

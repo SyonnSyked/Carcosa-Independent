@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.25)
-project(YELLOWTEAMGAME LANGUAGES CXX)
+project(YELLOWTEAMGAME LANGUAGES C CXX)
 
 if(NOT WIN32)
     message(FATAL_ERROR "YELLOWTEAMGAME currently supports the Windows development target only.")
@@ -8,10 +8,13 @@ if(NOT DEFINED ENV{VULKAN_SDK} OR "$ENV{VULKAN_SDK}" STREQUAL "")
     message(FATAL_ERROR "VULKAN_SDK is not set. Install the Vulkan SDK and reopen PowerShell.")
 endif()
 
+include(cmake/FastGltf.cmake)
+
 set(PROJECT_SOURCES
     src/main.cpp
     src/CCL.cpp
     src/DRAW/Level.cpp
+    src/DRAW/GltfEnvironment.cpp
     src/DRAW/VulkanBuffers.cpp
     src/DRAW/VulkanRenderer.cpp
     src/DRAW/VulkanTextures.cpp
@@ -59,6 +62,7 @@ set(PROJECT_SHADERS shaders/LevelVertex.hlsl shaders/LevelPixel.hlsl)
 set(CMAKE_NINJA_FORCE_RESPONSE_FILE ON)
 
 add_executable(${PROJECT_NAME} ${PROJECT_SOURCES} ${PROJECT_HEADERS} ${PROJECT_SHADERS})
+target_link_libraries(${PROJECT_NAME} PRIVATE fastgltf::fastgltf)
 add_custom_target(
     copy_runtime_content ALL
     COMMAND ${CMAKE_COMMAND} -E copy_directory "${CMAKE_CURRENT_SOURCE_DIR}/config"
@@ -94,11 +98,31 @@ source_group(TREE "${CMAKE_CURRENT_SOURCE_DIR}" FILES ${PROJECT_SOURCES} ${PROJE
 set_property(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}" PROPERTY VS_STARTUP_PROJECT ${PROJECT_NAME})
 
 option(CARCOSA_AXE_TESTS "Build warrior axe gameplay checks" OFF)
+option(CARCOSA_FASTGLTF_TESTS "Build fastgltf integration smoke check" OFF)
+if(CARCOSA_FASTGLTF_TESTS)
+    enable_testing()
+    add_executable(FastGltfSmoke tests/FastGltfSmoke.cpp)
+    target_link_libraries(FastGltfSmoke PRIVATE fastgltf::fastgltf)
+    set_target_properties(FastGltfSmoke PROPERTIES MSVC_RUNTIME_LIBRARY MultiThreadedDLL)
+    add_test(NAME FastGltfIntegration COMMAND FastGltfSmoke)
+    add_executable(GltfEnvironmentTests tests/GltfEnvironmentTests.cpp src/DRAW/GltfEnvironment.cpp)
+    target_link_libraries(GltfEnvironmentTests PRIVATE fastgltf::fastgltf)
+    target_compile_options(GltfEnvironmentTests PRIVATE /MD /EHsc)
+    target_compile_definitions(GltfEnvironmentTests PRIVATE UNICODE _UNICODE)
+    get_target_property(gltf_test_includes ${PROJECT_NAME} INCLUDE_DIRECTORIES)
+    target_include_directories(GltfEnvironmentTests PRIVATE ${gltf_test_includes})
+    target_link_directories(GltfEnvironmentTests PRIVATE "$ENV{VULKAN_SDK}/Lib")
+    target_precompile_headers(GltfEnvironmentTests PRIVATE precompiled.h)
+    add_test(NAME GltfEnvironment COMMAND GltfEnvironmentTests)
+    set_tests_properties(GltfEnvironment PROPERTIES WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}")
+endif()
+
 if(CARCOSA_AXE_TESTS)
     enable_testing()
     set(AXE_TEST_SOURCES ${PROJECT_SOURCES})
     list(REMOVE_ITEM AXE_TEST_SOURCES src/main.cpp)
     add_executable(AxeThrowTests tests/AxeThrowTests.cpp ${AXE_TEST_SOURCES})
+    target_link_libraries(AxeThrowTests PRIVATE fastgltf::fastgltf)
     target_compile_features(AxeThrowTests PRIVATE cxx_std_20)
     target_compile_options(AxeThrowTests PRIVATE /MD /EHsc)
     target_compile_definitions(AxeThrowTests PRIVATE UNICODE _UNICODE $<$<CONFIG:Debug>:DEBUG>)
@@ -116,6 +140,7 @@ if(CARCOSA_TRANSITION_TESTS)
     set(TRANSITION_TEST_SOURCES ${PROJECT_SOURCES})
     list(REMOVE_ITEM TRANSITION_TEST_SOURCES src/main.cpp)
     add_executable(LevelTransitionTests tests/LevelTransitionTests.cpp ${TRANSITION_TEST_SOURCES})
+    target_link_libraries(LevelTransitionTests PRIVATE fastgltf::fastgltf)
     target_compile_features(LevelTransitionTests PRIVATE cxx_std_20)
     target_compile_options(LevelTransitionTests PRIVATE /MD /EHsc)
     target_compile_definitions(LevelTransitionTests PRIVATE UNICODE _UNICODE $<$<CONFIG:Debug>:DEBUG>)
